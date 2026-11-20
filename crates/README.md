@@ -75,9 +75,11 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
   typed decode build a dynamic value first, so typed decoding would need coercion of
   its own, and two implementations of one behaviour is [CLAUDE.md](CLAUDE.md)
   anti-pattern 6. So the decoder walks the sender's type and the receiver's together
-  over the bytes, handing what it reads to a builder for the receiver's side — the
-  dynamic value, or a derived Rust type — and the speculative `opt` rule rewinds to
-  the value's start, skips it and yields `null`. There is no value-to-value
+  over the bytes, for a receiver -- the dynamic value, or a derived Rust type -- that
+  says what it builds. The speculative `opt` rule is speculative about the *coercion*,
+  not the bytes: when the value under an `opt` does not coerce, the decoder skips
+  forward to the value's end, validating it, and yields `null`. It never rewinds
+  ([Values](#values)). There is no value-to-value
   coercion: the `coerce` vectors run as encode-then-decode, and so can a tool that
   wants to convert a value.
 - **`candid_binary` must be usable with zero derive and zero serde.** Anyone writing
@@ -88,6 +90,160 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
   one crate; the layer crates are for tool authors. That is how the split stays
   fine-grained without forcing ten dependencies into every canister's
   `Cargo.toml`.
+
+## Values
+
+The plan for the value half of `candid_binary`, and for `candid_value`. Not built yet;
+this section is what review agrees on before it is.
+
+### Two traits, one engine
+
+`candid_binary` defines how a value goes in and out, and nothing else does:
+
+```rust
+pub trait Encode {
+    fn encode(&self, writer: ValueWriter<'_>) -> Result<(), EncodeError>;
+}
+
+pub trait Decode<'a>: Sized {
+    /// `Ok(None)`: the value does not coerce to `Self` -- the spec's *failure*, which
+    /// an enclosing `opt` turns into `null`. `Err`: the message is rejected.
+    fn try_decode(reader: ValueReader<'_, 'a>) -> Result<Option<Self>, DecodeError>;
+}
+```
+
+`candid_value::Value` implements both, and so will derived types. `'a` is the message's
+lifetime, so a receiver can borrow text and blobs from it instead of copying: a
+`View<'b> { text: &'b str }` implements `Decode<'a>` for every `'a: 'b`.
+
+So the facade's `CandidType` is `Encode` plus `intern_type`, and does not require `Decode`: a
+bound such as `for<'a> Decode<'a>` would shut out every borrowing type, even where it
+is only encoded. A decoding call site asks for `Decode<'a>` at the message's lifetime,
+or for `DecodeOwned` -- `for<'a> Decode<'a>`, as serde's `DeserializeOwned` -- when
+the value must outlive the message, which a blanket impl provides. The derive implements
+`CandidType`, `Encode` and `Decode`.
+
+**The receiver drives; the decoder decides.** A reader is one value of the message,
+paired with the receiver's type for it: a sender's slot and position, and a `Root` in
+the receiver's table. The receiver says what shape it is building -- `reader.nat()`,
+`reader.record()`, `reader.opt(|inner| ...)` -- and the decoder applies the coercion rule
+for that pair of types (`lean/Spec/Types.md`, Section 6): `nat` read as `int`, fields
+the receiver lacks skipped, fields the sender lacks filled with `null` if their type
+accepts it, the `opt` rules, references checked by `is_subtype`. A receiver never sees a
+sender's type, so every coercion rule is written once, in the decoder. A dynamic value,
+which has no shape of its own, asks `reader.expected()` and follows the receiver's
+type. Calling a method that does not match `expected()` is a bug in the receiver, and
+returns an error rather than a wrong value.
+
+**No rewinding.** `lean/Spec/Binary.md`, Section 7, requires every value to be read and checked,
+including the ones coercion drops: a failure inside an `opt` yields `null`, but a
+malformed byte after it still rejects the message. So when a receiver gives up on a
+value (`Ok(None)`), the decoder does not go back to the value's start. It skips from
+where it is to the value's end, validating as it goes. Every byte is read once, where
+rewind-and-skip would read the bytes of nested `opt`s once per level.
+
+**The decoder is an explicit stack.** It keeps a frame per open record, vector and
+variant of the sender's: its type and how far through it is. That is what lets it skip
+to a value's end after the receiver has left mid-record, and what makes skipping --
+arguments past the receiver's, fields it does not have -- iterative rather than
+recursive. Recursion is left only in receivers, which follow the nesting of the values
+they build; `Limits::depth` bounds it. The stack also gives the check of Binary.md,
+Section 6.6, for free: a record entered at the position where an enclosing frame entered the same
+entry.
+
+**A message is an argument sequence.** `Decoder::argument(expected)` gives the reader
+for the next argument; past the sender's last, it is a reader of an absent value, which
+is `null` if `expected` accepts it and a failure otherwise (`lean/Spec/Types.md`,
+Section 6.8).
+`Decoder::finish` skips the arguments the receiver did not ask for and rejects bytes
+after the last value.
+
+**Results.** Three outcomes, as Section 6.1 of Types.md has them: a value is `Ok(Some(_))`, failure
+is `Ok(None)`, and undefined -- reading a value that does not accept `null` at an
+infinite option -- is an `Err`, like a malformed message and a resource limit. A
+failure an `opt` does not absorb rejects the message too; `Decoder::argument`'s caller
+gets it as `Ok(None)` and the facade turns it into an error naming the argument.
+
+**Fast paths are specialisations.** `vec nat8` read into a `&[u8]` or `Vec<u8>`, and
+text read into a `&str`, take the bytes in one step. They are the general path with
+the loop unrolled, covered by the same vectors (CLAUDE.md, anti-pattern 6).
+
+**References.** A `func` or `service` value coerces only if its type is a subtype of the
+expected one. The decoder caches each answer by the pair of table entries, so a vector
+of a million references costs one subtype check.
+
+### Writing
+
+`Encoder::argument()` gives a `ValueWriter` for the next argument type, and `finish`
+fails until every argument has one. A writer checks each value against its type as it
+writes it -- `writer.nat(n)` at a `text` is an `EncodeError` -- since a message whose
+values do not have its types is not a message. Records are written through
+`writer.record()`, whose fields come in the table's order, ascending id: the order a
+`TypeTable` keeps them in, and the order a derive can sort its fields into at compile
+time. A variant is written by its id; the writer finds the index. Numbers are written in
+their shortest form.
+
+### `candid_value`
+
+`Value` transcribes Lean's (`lean/Candid/Value.lean`), with its three choices:
+
+- **One `null`.** It is the value of `null`, of `reserved`, of an absent option and of a
+  future type. A `Value` does not know its type; a receiver's type says which it is.
+- **Floats are their bits**, so equality is bitwise: a NaN equals itself, and `-0.0` is
+  not `0.0`. Constructors and accessors take and give `f32` and `f64`.
+- **Records are canonical**: fields in strictly ascending id, so two equal records are
+  equal as lists.
+
+Two more, of Rust's:
+
+- **`nat` and `int` are arbitrary precision**, as `Nat` and `Int`. They wrap
+  `num-bigint`, which `candid` 0.10 uses too, but do not expose it: the wrapper is the
+  API, so `num-bigint` can change without a breaking change here. The decoder hands a
+  receiver the number's bytes, so `candid_binary` needs no big-number crate.
+- **A blob is not a million values.** `Value::Blob(Vec<u8>)` holds a `vec nat8`, and
+  equals the `Value::Vec` of the same `nat8`s. A receiver of type `vec nat8` always
+  builds a `Blob`.
+
+Principals are `ic_principal::Principal`. Text syntax -- printing and parsing values --
+is `candid_syntax`'s, not this crate's.
+
+### Limits
+
+`Limits` grows two fields:
+
+- `values`: the most values a message may stand for, counting every value wherever it
+  is -- skipped, inside another, past the expected arguments. That is Lean's `limit`,
+  counted the same way, so that a message one rejects for its count the other does too.
+  It is what stops a `vec null` of length 10⁹.
+- `depth`: the deepest a receiver may nest.
+
+Both are resource limits (Binary.md, Section 9), with defaults generous for any real
+message.
+
+### Lean: `decodeAt`
+
+Lean decodes a message and then coerces its values; Rust does both in one pass. Before
+the Rust decoder, Lean gets `decodeAt`: the one pass, written as Rust will be --
+reading at a pair of types, skipping on failure -- and a theorem that it gives the same
+answer as `decode` followed by `coerce`. The Rust decoder then transcribes `decodeAt`,
+as `is_subtype` transcribes `decSubtype`, and the theorem is what says the one pass is
+the spec.
+
+### Order of work
+
+1. `candid_value`, and writing values. A `decode` vector's values are the receiver's,
+   after coercion, so they give back its bytes only where nothing was coerced. The check
+   is therefore on the vectors whose own header is the receiver's -- the same table and
+   argument types, which the header decoder can already tell -- whose bytes are in
+   shortest form, and whose table has no future type: writing their values with that
+   header must give their bytes. A future value is the exception to "nothing was
+   coerced": its bytes are skipped and it decodes to `null`, which is written back as
+   `00 00` (`lean/Candid/Wire.lean`), so a nonempty one does not come back. No vector has
+   one yet. The rest wait for step 3, which compares by decoding.
+2. Lean's `decodeAt`, and the theorem.
+3. Reading values at the receiver's types. Checked by every `decode` vector in full, and
+   every `coerce` vector as encode-then-decode.
+4. Differential fuzzing against Lean, and the `costly` vectors under `Limits`.
 
 ## Naming
 
@@ -140,35 +296,37 @@ identifier called a table.
 This is the change that motivates the version bump, so it is worth stating
 precisely.
 
-Candid's coercion rule requires **speculative decoding with backtracking**: when a
-value cannot be coerced to the expected type inside an `opt`, the result is `null`
-rather than an error. serde's `Visitor` is a consume-once, move-in API that
+Candid's coercion rule requires **speculative coercion**: when a value cannot be
+coerced to the expected type inside an `opt`, the result is `null` rather than an
+error, and the receiver has to be able to give up on a value it has started to build.
+serde's `Visitor` is a consume-once, move-in API that
 provides no "would you accept this?" query, so the current implementation
 identifies visitors by string-matching serde's private module paths and `ptr::read`s
 them ([rust/candid/src/de.rs:740](../rust/candid/src/de.rs#L740)). serde 1.0.220
 moved those paths and broke it. Both bugs fixed in 0.10.34 trace to the same
 mismatch.
 
-The replacement makes backtracking first-class:
+The replacement makes giving up first-class. A receiver that cannot coerce returns
+`Ok(None)`, and the decoder, not the receiver, skips forward past the rest of the
+value; nothing goes back over bytes already read.
 
 ```rust
-pub trait CandidType: Sized {
-    fn ty(table: &mut RawTypeTable) -> Slot;
-    fn encode<E: Encoder>(&self, e: E) -> Result<(), E::Error>;
+pub trait CandidType: Encode {
+    /// Add this type's entries to `table`, and return the slot that names it --
+    /// as `RawTypeTable::intern` does for one entry. 0.10's `ty()`.
+    fn intern_type(table: &mut RawTypeTable) -> Slot;
+}
 
+pub trait Decode<'a>: Sized {
     /// Returns Ok(None) when the wire value cannot be coerced to Self.
-    /// The decoder is left positioned to skip the value; the caller does
-    /// not rewind. This is the opt-coercion primitive.
-    fn try_decode<D: Decoder>(d: &mut D) -> Result<Option<Self>, D::Error>;
-
-    fn decode<D: Decoder>(d: &mut D) -> Result<Self, D::Error> {
-        Self::try_decode(d)?.ok_or_else(|| D::Error::type_mismatch())
-    }
+    /// The decoder skips the rest of the value; the caller does not
+    /// rewind. This is the opt-coercion primitive.
+    fn try_decode(reader: ValueReader<'_, 'a>) -> Result<Option<Self>, DecodeError>;
 }
 ```
 
-`Decoder` exposes Candid-shaped operations — `read_opt`, `read_record`,
-`read_variant`, `read_vec`, `skip_value` — not serde's data model. Consequences:
+A `ValueReader` exposes Candid-shaped operations — `opt`, `record`, `variant`, `vec` —
+not serde's data model ([Values](#values) has the design). Consequences:
 
 - One derive (`#[derive(CandidType)]`) instead of `#[derive(CandidType,
   Deserialize)]`; downstream users stop needing serde as a direct dependency.
@@ -236,7 +394,7 @@ floated `candid_serde_compat` — a shim accepting any `serde::Deserialize` type
 Candid boundary — and it is worth recording why that was rejected, because the
 reasoning generalises.
 
-**It cannot supply `ty()`.** Candid needs a type-table entry; `Serialize` and
+**It cannot supply `intern_type`.** Candid needs a type-table entry; `Serialize` and
 `Deserialize` are value-level traits with no type-level reflection. Structure can be
 recovered by driving a `Deserialize` impl with an instrumented tracing
 deserializer — [serde-reflection](https://github.com/zefchain/serde-reflection) does
@@ -256,8 +414,8 @@ boundary today. Nothing regresses by declining to build the bridge, and existing
 code is unaffected for a different reason: `#[derive(CandidType, Deserialize)]` goes
 on compiling, with the `Deserialize` half simply never consulted.
 
-The escape hatch instead mirrors `#[serde(with)]` — a module supplying `ty`,
-`encode` and `try_decode` for one field:
+The escape hatch instead mirrors `#[serde(with)]` — a module supplying
+`intern_type`, `encode` and `try_decode` for one field:
 
 ```rust
 #[derive(CandidType)]
