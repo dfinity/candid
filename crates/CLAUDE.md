@@ -45,7 +45,7 @@ shape `ic_principal` already uses), and serde as a config-file deserializer in
 prohibition. See [README.md](README.md#scope-serde-leaves-the-data-path-entirely).
 
 A foreign type that needs a Candid representation gets a `#[candid(with = "...")]`
-adapter, never a serde bridge — a bridge cannot supply `ty()`, and the reasoning is
+adapter, never a serde bridge — a bridge cannot supply `intern_type`, and the reasoning is
 recorded in
 [README.md](README.md#foreign-types-get-an-adapter-not-a-serde-bridge) so it does
 not get relitigated.

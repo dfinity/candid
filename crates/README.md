@@ -116,7 +116,7 @@ pub trait Decode<'a>: Sized {
 lifetime, so a receiver can borrow text and blobs from it instead of copying: a
 `View<'b> { text: &'b str }` implements `Decode<'a>` for every `'a: 'b`.
 
-So the facade's `CandidType` is `Encode` plus `ty()`, and does not require `Decode`: a
+So the facade's `CandidType` is `Encode` plus `intern_type`, and does not require `Decode`: a
 bound such as `for<'a> Decode<'a>` would shut out every borrowing type, even where it
 is only encoded. A decoding call site asks for `Decode<'a>` at the message's lifetime,
 or for `DecodeOwned` -- `for<'a> Decode<'a>`, as serde's `DeserializeOwned` -- when
@@ -309,7 +309,9 @@ value; nothing goes back over bytes already read.
 
 ```rust
 pub trait CandidType: Encode {
-    fn ty(table: &mut RawTypeTable) -> Slot;
+    /// Add this type's entries to `table`, and return the slot that names it --
+    /// as `RawTypeTable::intern` does for one entry. 0.10's `ty()`.
+    fn intern_type(table: &mut RawTypeTable) -> Slot;
 }
 
 pub trait Decode<'a>: Sized {
@@ -389,7 +391,7 @@ floated `candid_serde_compat` — a shim accepting any `serde::Deserialize` type
 Candid boundary — and it is worth recording why that was rejected, because the
 reasoning generalises.
 
-**It cannot supply `ty()`.** Candid needs a type-table entry; `Serialize` and
+**It cannot supply `intern_type`.** Candid needs a type-table entry; `Serialize` and
 `Deserialize` are value-level traits with no type-level reflection. Structure can be
 recovered by driving a `Deserialize` impl with an instrumented tracing
 deserializer — [serde-reflection](https://github.com/zefchain/serde-reflection) does
@@ -409,8 +411,8 @@ boundary today. Nothing regresses by declining to build the bridge, and existing
 code is unaffected for a different reason: `#[derive(CandidType, Deserialize)]` goes
 on compiling, with the `Deserialize` half simply never consulted.
 
-The escape hatch instead mirrors `#[serde(with)]` — a module supplying `ty`,
-`encode` and `try_decode` for one field:
+The escape hatch instead mirrors `#[serde(with)]` — a module supplying
+`intern_type`, `encode` and `try_decode` for one field:
 
 ```rust
 #[derive(CandidType)]
