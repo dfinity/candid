@@ -234,9 +234,12 @@ the spec.
 1. `candid_value`, and writing values. A `decode` vector's values are the receiver's,
    after coercion, so they give back its bytes only where nothing was coerced. The check
    is therefore on the vectors whose own header is the receiver's -- the same table and
-   argument types, which the header decoder can already tell -- and whose bytes are in
-   shortest form: writing their values with that header must give their bytes. The rest
-   wait for step 3, which compares by decoding.
+   argument types, which the header decoder can already tell -- whose bytes are in
+   shortest form, and whose table has no future type: writing their values with that
+   header must give their bytes. A future value is the exception to "nothing was
+   coerced": its bytes are skipped and it decodes to `null`, which is written back as
+   `00 00` (`lean/Candid/Wire.lean`), so a nonempty one does not come back. No vector has
+   one yet. The rest wait for step 3, which compares by decoding.
 2. Lean's `decodeAt`, and the theorem.
 3. Reading values at the receiver's types. Checked by every `decode` vector in full, and
    every `coerce` vector as encode-then-decode.
