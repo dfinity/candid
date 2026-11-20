@@ -120,7 +120,8 @@ So the facade's `CandidType` is `Encode` plus `ty()`, and does not require `Deco
 bound such as `for<'a> Decode<'a>` would shut out every borrowing type, even where it
 is only encoded. A decoding call site asks for `Decode<'a>` at the message's lifetime,
 or for `DecodeOwned` -- `for<'a> Decode<'a>`, as serde's `DeserializeOwned` -- when
-the value must outlive the message. The derive implements all three.
+the value must outlive the message, which a blanket impl provides. The derive implements
+`CandidType`, `Encode` and `Decode`.
 
 **The receiver drives; the decoder decides.** A reader is one value of the message,
 paired with the receiver's type for it: a sender's slot and position, and a `Root` in
