@@ -6,16 +6,17 @@
 - `candid_types`: the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
   and [Hash.lean](../lean/Candid/Hash.lean), and the subtyping of
   [Subtype.lean](../lean/Candid/Subtype.lean);
-- `candid_binary`: from [Wire.lean](../lean/Candid/Wire.lean), the header of a message
-  -- its type table and argument types -- read and written, and its values written;
+- `candid_binary`: messages, from [Wire.lean](../lean/Candid/Wire.lean) and
+  [DecodeAt.lean](../lean/Candid/DecodeAt.lean): written, and read at the receiver's
+  types, which is coercion;
 - `candid_value`: the dynamic value of [Value.lean](../lean/Candid/Value.lean), which
-  `candid_binary` writes;
+  `candid_binary` writes and reads;
 - `conformance_tests`: not a library, but the one test that reads
   [conformance/vectors/](../conformance/vectors/) and asks each crate what it can answer:
   the `hash`, `wellformed` and `subtype` vectors, every table the other vectors promise
-  is well formed, the header of every `decode` vector's message, and every value in a
-  vector written at its type -- and where nothing was coerced, giving back the vector's
-  bytes.
+  is well formed, every `decode` vector's message read at its types, every `coerce`
+  vector written at `from` and read at `to` -- alone and in context -- and every value in
+  a vector written at its type, giving back the vector's bytes where nothing was coerced.
 
 Nothing here is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this
 exists.
@@ -97,9 +98,9 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
 
 ## Values
 
-The plan for the value half of `candid_binary`, and for `candid_value`. Writing values,
-and `candid_value`, are built (step 1 of the [order of work](#order-of-work)); reading
-them is not yet.
+The plan for the value half of `candid_binary`, and for `candid_value`. Built: writing
+values, `candid_value`, Lean's `decodeAt`, and reading values at the receiver's types --
+steps 1 to 3 of the [order of work](#order-of-work).
 
 ### Two traits, one engine
 
@@ -176,6 +177,20 @@ the loop unrolled, covered by the same vectors (CLAUDE.md, anti-pattern 6).
 **References.** A `func` or `service` value coerces only if its type is a subtype of the
 expected one. The decoder caches each answer by the pair of table entries, so a vector
 of a million references costs one subtype check.
+
+As built: the parts of an `opt`, a `vec`, a record and a variant are handed to the
+receiver through closures -- `reader.opt(|inner| ...)`, `reader.record(|fields| ...)`,
+`fields.field(id, |value| ...)` -- and each method reads its value to the end before it
+returns, whatever the closure did. So the readers are the frames of the explicit stack,
+as the writers are, and each knows how far through its value it is: when a receiver
+gives up, the method skips the rest of its own value, and a reader the receiver drops
+unread is skipped by the one that handed it out. Skipping is a loop over a stack of its
+own, which counts and rejects as `decodeValue` does. Once a part fails, nothing more of
+the value is read at the receiver's types, as in `decodeAt`; a record field the receiver
+does not ask for is still read at its type, so the receiver's type decides the record,
+not which fields the receiver keeps. The subtype cache lives for one argument, since the
+next may be at another receiver's table. `nat` and `int` come out as `Natural` and
+`Integer`, which read the number out as bytes or a fixed-size integer.
 
 ### Writing
 
