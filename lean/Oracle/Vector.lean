@@ -620,4 +620,59 @@ def Assertion.withinDisagreement : Assertion → Option String
       | none => some "the model runs out within its limit"
   | _ => none
 
+/-! ## One pass
+
+`decodeAt` (`Candid/DecodeAt.lean`) reads a message at the receiver's types in one pass,
+and is claimed to give exactly the answer of `decode` followed by `coerceArguments`:
+the same values, the same failure, the same error at the same byte. The claim,
+`decodeAt_eq`, is checked here rather than proved. -/
+
+/-- `decode` then `coerceArguments`: what `decodeAt` must equal. -/
+def decodeThenCoerce (bs : ByteArray) (B : TypeTable) (us : List Slot) (limit : Option Nat) :
+    Except DecodeError (Outcome (List Value)) := do
+  let m ← decode bs limit
+  pure (coerceArguments m.table B m.values m.types us).run
+
+def sameAnswer : Except DecodeError (Outcome (List Value)) →
+    Except DecodeError (Outcome (List Value)) → Bool
+  | .error e, .error f => e == f
+  | .ok (.ok a), .ok (.ok b) => a == b
+  | .ok (.error a), .ok (.error b) => a == b
+  | _, _ => false
+
+def describeAnswer : Except DecodeError (Outcome (List Value)) → String
+  | .error e => s!"error at byte {e.position}: {e.message}"
+  | .ok (.ok (some vs)) => (expectValuesToJson (some vs)).compress
+  | .ok (.ok none) => "failure"
+  | .ok (.error _) => "undefined"
+
+/-- Where `decodeAt` and `decodeThenCoerce` differ, at any of these limits. -/
+def onePassDisagreement (bs : ByteArray) (B : TypeTable) (us : List Slot)
+    (limits : List (Option Nat)) : Option String :=
+  limits.findSome? fun limit =>
+    let got := decodeAt bs B us limit
+    let want := decodeThenCoerce bs B us limit
+    if sameAnswer got want then none
+    else some s!"decodeAt (limit {limit}) gives {describeAnswer got}, decode then coerce {describeAnswer want}"
+
+/-- `decodeAt_eq` on the bytes of a vector: every `decode` vector, within the oracle's
+limit and without one; every `costly` one within the limit; and every `coerce` vector as
+encode-then-decode, which must also give the vector's answer. -/
+def Assertion.decodeAtDisagreement : Assertion → Option String
+  | .decode bs ts _ => ts.check?.bind fun ⟨B, us⟩ =>
+    onePassDisagreement bs B (us.map (·.1)) [none, some costlyLimit]
+  | .decodeCostly bs ts => ts.check?.bind fun ⟨B, us⟩ =>
+    onePassDisagreement bs B (us.map (·.1)) [some costlyLimit]
+  | .coerce v a b want => match a.check?, b.check? with
+    | some ⟨A, a⟩, some ⟨B, b⟩ => match encode A [a.1] [v] with
+      | none => some "the value does not encode at the type it is coerced from"
+      | some bs => (onePassDisagreement bs B [b.1] [none]).orElse fun _ =>
+        let got := match decodeAt bs B [b.1] with
+          | .ok (.ok (some [w])) => some w
+          | _ => none
+        if got == want then none
+        else some s!"encoded and decoded in one pass, got {(expectToJson got).compress}"
+    | _, _ => none
+  | _ => none
+
 end Oracle

@@ -320,6 +320,53 @@ def encodeRejections : List String :=
           some s!"wire: {showValue w} : {a.name} encodes, but is not of the type"
         else none
 
+/-- `T` with `cs` after its entries, the first of them at index `T.size`. -/
+def extendTable (T : TypeTable) (cs : List Composite) : Option TypeTable :=
+  ({ entries := T.raw.entries ++ cs.toArray } : RawTypeTable).check
+
+/-- `decodeAt` is `decode` then `coerceArguments` (`decodeAt_eq`, `Candid/DecodeAt.lean`),
+on messages where a value that fails or is undefined has more after it to skip. Every
+sample `v` of a type `a`, against every type `b` in the universe:
+
+- `(v, v) : (a, a)`, read at `(b, b)`, at `(b)` and at `()`;
+- `vec {v; v} : vec a`, read at `vec b`;
+- `record {0 = v; 1 = v} : record {0 : a; 1 : a}`, read at `record {0 : b; 1 : b}`, at
+  `record {1 : b; 2 : b}` -- a field skipped, one missing -- and at
+  `record {0 : b; 2 : b}`.
+
+Skipping too little or too much leaves bytes over, or runs out. -/
+def decodeAtViolations : List String :=
+  coerceUniverse.flatMap fun a => match a.checked? with
+    | none => []
+    | some ⟨_, A, ra⟩ => (samples A 3 ra.1).flatMap fun v =>
+      let t := ra.1
+      let pair (i j : Nat) (s : Slot) : Composite := .record [(i.toUInt32, s), (j.toUInt32, s)]
+      let sent := do
+        let A' ← extendTable A [.vec t, pair 0 1 t]
+        let r := Slot.ref A.size
+        let r' := Slot.ref (A.size + 1)
+        let arguments ← encode A [t, t] [v, v]
+        let vector ← encode A' [r] [.vec [v, v]]
+        let record ← encode A' [r'] [.record [(0, v), (1, v)]]
+        return (arguments, vector, record)
+      match sent with
+      | none => [s!"one pass: {showValue v} : {a.name} does not encode"]
+      | some (arguments, vector, record) => coerceUniverse.filterMap fun b =>
+        match b.checked? with
+        | none => none
+        | some ⟨_, B, rb⟩ =>
+          let u := rb.1
+          let checks : List (ByteArray × Option TypeTable × List Slot) :=
+            [(arguments, some B, [u, u]), (arguments, some B, [u]), (arguments, some B, []),
+             (vector, extendTable B [.vec u], [.ref B.size]),
+             (record, extendTable B [pair 0 1 u], [.ref B.size]),
+             (record, extendTable B [pair 1 2 u], [.ref B.size]),
+             (record, extendTable B [pair 0 2 u], [.ref B.size])]
+          checks.findSome? fun (bs, B', us) => match B' with
+            | none => some s!"one pass: a table built from {b.name} is malformed"
+            | some B' => (onePassDisagreement bs B' us [none]).map fun d =>
+              s!"one pass: {showValue v} : {a.name} at {b.name}: {d}"
+
 /-- Types the generator built that were not well formed. Expected to be empty: the
 oracle fails if it is not, since `pairs` drops them silently. -/
 def malformed : List String :=
