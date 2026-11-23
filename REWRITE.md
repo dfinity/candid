@@ -100,7 +100,7 @@ path is the only thing keeping the dependency alive. Dropping it takes the
 means v1 owes `blob` a native spelling. What survives is serde used as serde and
 nothing more: an ordinary config-file deserializer in the binding generator, and an
 optional off-by-default feature letting leaf types like `Nat` cross into JSON.
-Nothing bridges serde back in: a compatibility shim cannot supply `ty()`, so foreign
+Nothing bridges serde back in: a compatibility shim cannot supply `intern_type`, so foreign
 types get a local `#[candid(with = "...")]` adapter instead.
 [crates/README.md](crates/README.md#scope-serde-leaves-the-data-path-entirely)
 draws both lines.
