@@ -115,6 +115,47 @@ pub(crate) fn write_signed(out: &mut Vec<u8>, mut i: i64) {
     }
 }
 
+/// The number `leb` spells -- LEB128 if not `signed`, SLEB128 if it is, ending at its last
+/// byte -- as base-256 digits, least significant first, in as few as hold it: for an
+/// unsigned number no trailing zero byte, for a signed one two's complement with no
+/// trailing byte that only repeats the sign. 0 is no bytes.
+pub(crate) fn to_le_bytes(leb: &[u8], signed: bool) -> Vec<u8> {
+    let mut out = Vec::new();
+    let (mut acc, mut bits) = (0u32, 0u32);
+    for &b in leb {
+        acc |= u32::from(b & 0x7f) << bits;
+        bits += 7;
+        while bits >= 8 {
+            out.push(acc as u8);
+            acc >>= 8;
+            bits -= 8;
+        }
+    }
+    let negative = signed && leb.last().is_some_and(|&b| b & 0x40 != 0);
+    let fill: u8 = if negative { 0xff } else { 0x00 };
+    if negative {
+        acc |= 0xff << bits;
+    }
+    out.push(acc as u8);
+    if signed {
+        // Drop a byte that only repeats the sign, while the one below it keeps the sign.
+        while let [.., below, top] = out[..] {
+            if top != fill || (below ^ fill) & 0x80 != 0 {
+                break;
+            }
+            out.pop();
+        }
+    } else {
+        while out.last() == Some(&0) {
+            out.pop();
+        }
+    }
+    if out == [0] {
+        out.clear();
+    }
+    out
+}
+
 /// Unsigned LEB128, shortest form, of the number whose base-256 digits `le` holds, least
 /// significant first. Trailing zero bytes are allowed, and add nothing.
 pub(crate) fn write_unsigned_bytes(out: &mut Vec<u8>, le: &[u8]) {
@@ -212,6 +253,42 @@ mod tests {
             [0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x7e]
         );
         assert_eq!(read_signed(&got), Some((Signed::Below, 10)));
+    }
+
+    #[test]
+    fn leb128_to_bytes() {
+        let mut state: u64 = 0x1234_5678_9abc_def1;
+        for _ in 0..10_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let n = state >> (state % 64);
+            let mut padded = unsigned(n);
+            // A redundant continuation byte or two changes nothing.
+            if n % 3 == 0 {
+                *padded.last_mut().unwrap() |= 0x80;
+                padded.extend([0x80, 0x00]);
+            }
+            let bytes = to_le_bytes(&padded, false);
+            let mut back = Vec::new();
+            write_unsigned_bytes(&mut back, &bytes);
+            assert_eq!(back, unsigned(n), "{n}");
+            assert!(bytes.last() != Some(&0));
+
+            let i = n as i64;
+            let bytes = to_le_bytes(&signed(i), true);
+            let mut wide = [if i < 0 { 0xff } else { 0 }; 8];
+            wide[..bytes.len()].copy_from_slice(&bytes);
+            assert_eq!(i64::from_le_bytes(wide), i, "{i}");
+            let mut back = Vec::new();
+            write_signed_bytes(&mut back, &bytes);
+            assert_eq!(back, signed(i), "{i}");
+        }
+        assert_eq!(to_le_bytes(&[0x00], true), Vec::<u8>::new());
+        assert_eq!(to_le_bytes(&[0x80, 0x00], false), Vec::<u8>::new());
+        assert_eq!(to_le_bytes(&[0x7f], true), [0xff]);
+        assert_eq!(to_le_bytes(&[0xc0, 0x00], true), [0x40]);
+        assert_eq!(to_le_bytes(&[0x80, 0x01], true), [0x80, 0x00]);
     }
 
     fn unsigned(n: u64) -> Vec<u8> {
