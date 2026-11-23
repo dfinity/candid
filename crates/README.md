@@ -198,8 +198,23 @@ Two more, of Rust's:
 
 - **`nat` and `int` are arbitrary precision**, as `Nat` and `Int`. They wrap
   `num-bigint`, which `candid` 0.10 uses too, but do not expose it: the wrapper is the
-  API, so `num-bigint` can change without a breaking change here. The decoder hands a
-  receiver the number's bytes, so `candid_binary` needs no big-number crate.
+  API, so no `num-bigint` release forces a breaking release here, and the storage
+  stays free to change -- to hold numbers below 2^64 inline, say, if a benchmark asks
+  for it. The decoder hands a receiver the number's bytes, so `candid_binary` needs no
+  big-number crate.
+
+  The API is what people do with these numbers, ledger amounts above all: conversion
+  to and from the fixed-size integers, `Display` and `FromStr` in decimal, comparison,
+  and the common arithmetic. Beyond it, two ways out:
+
+  - **Bytes, always.** `Nat::from_le_bytes`/`to_le_bytes` spell the magnitude in base
+    256, least significant byte first -- shortest out, any length in; `Int` does the
+    same in two's complement. That is a fact about integers, not about the storage, so
+    it never needs to change, and every big-number crate reads and writes it.
+  - **`From`/`Into` behind a versioned feature**, `num-bigint-04`, the
+    `with-chrono-0_4` shape of `postgres-types`. `num-bigint` 0.5 gets
+    `num-bigint-05` beside it, an additive release; the old one goes at a major
+    version of this crate, not of `num-bigint`.
 - **A blob is not a million values.** `Value::Blob(Vec<u8>)` holds a `vec nat8`, and
   equals the `Value::Vec` of the same `nat8`s. A receiver of type `vec nat8` always
   builds a `Blob`.
