@@ -502,6 +502,13 @@ Named here so they are obligations rather than oversights.
   "What slice 3 established"); the theorems are about every value, and soundness is
   the one MiniCandid proves as `coerce_well_defined`. Stated in prose in
   [Candid/Coerce.lean](Candid/Coerce.lean)'s header, not as `sorry`s.
+- **Decoding in one pass is the spec, as a theorem.**
+  [Candid/DecodeAt.lean](Candid/DecodeAt.lean)'s `decodeAt` reads a message at the
+  receiver's types in one pass, as `candid_binary` will, and `decodeAt_eq` says it equals
+  `decode` followed by `coerceArguments`, errors included. The executable checks it on
+  every `decode` and `coerce` vector, and on generated messages where a failed value
+  has more after it to skip (`decodeAtViolations`); stated in the file's header, not as
+  a `sorry`.
 - **Membership is a scan.** `seen` and `seenRev` are lists, so `contains` walks every
   pair recorded so far, and a table of *n* entries in one long cycle costs O(n²):
   measured 234 ms at 10,000 entries and 6.3 s at 50,000. `run` is tail-recursive, so

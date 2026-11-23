@@ -12,6 +12,7 @@ import Candid.SubtypeSpec
 import Candid.Value
 import Candid.Coerce
 import Candid.Wire
+import Candid.DecodeAt
 import Candid.Equiv
 import Candid.Principal
 import Candid.Float

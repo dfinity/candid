@@ -272,7 +272,7 @@ rejected; the reason is for people. -/
 structure DecodeError where
   position : Nat
   message : String
-  deriving Repr
+  deriving Repr, BEq
 
 /-- Read from `pos`, consuming at least one byte. -/
 abbrev Read1 (bs : ByteArray) (pos : Nat) (α : Type) :=
@@ -627,6 +627,29 @@ def decodeArguments (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤
 
 /-! ## Messages -/
 
+/-- A message's header, checked: its table, its argument types, and where its values
+start. -/
+structure CheckedHeader (bs : ByteArray) where
+  table : TypeTable
+  types : List Slot
+  pos : Nat
+  hpos : pos ≤ bs.size
+
+/-- The magic number, the type table and the argument types, read and checked: the table
+well formed, and every argument type resolving in it. -/
+def decodeHeader (bs : ByteArray) : Except DecodeError (CheckedHeader bs) := do
+  let ((raw, types), pos) ← (Parse.header.run bs).run 0
+  let some table := raw.check
+    | throw ⟨pos, "the type table is not well formed"⟩
+  unless types.all table.resolves do
+    throw ⟨pos, "an argument type does not resolve"⟩
+  if hpos : pos ≤ bs.size then return ⟨table, types, pos, hpos⟩
+  else throw ⟨pos, "unreachable: the header ends past the input"⟩
+
+/-- Nothing after the last value, which ends at `q`. -/
+def finish (bs : ByteArray) (q : Nat) : Except DecodeError Unit :=
+  unless q == bs.size do throw ⟨q, s!"{bs.size - q} bytes after the last value"⟩
+
 /-- A decoded message: its type table, its argument types, and its values, each of its
 type, and how many values were decoded, counting every value inside another. Nothing has
 been coerced. -/
@@ -640,18 +663,12 @@ structure Message where
 With a `limit`, decoding stops with `exhausted` as soon as the count passes it; see
 "Costly messages" in the header. -/
 def decode (bs : ByteArray) (limit : Option Nat := none) : Except DecodeError Message := do
-  let ((raw, types), pos) ← (Parse.header.run bs).run 0
-  let some table := raw.check
-    | throw ⟨pos, "the type table is not well formed"⟩
-  unless types.all table.resolves do
-    throw ⟨pos, "an argument type does not resolve"⟩
-  if hpos : pos ≤ bs.size then
-    match decodeArguments table bs pos hpos limit 0 types with
-    | .error e => throw e
-    | .ok ((values, count), ⟨q, _⟩) =>
-      unless q == bs.size do throw ⟨q, s!"{bs.size - q} bytes after the last value"⟩
-      return { table, types, values, count }
-  else throw ⟨pos, "unreachable: the header ends past the input"⟩
+  let ⟨table, types, pos, hpos⟩ ← decodeHeader bs
+  match decodeArguments table bs pos hpos limit 0 types with
+  | .error e => throw e
+  | .ok ((values, count), ⟨q, _⟩) =>
+    finish bs q
+    return { table, types, values, count }
 
 /-- Deserialisation at the expected types `expected` in `B`, decoding at most `limit`
 values: decode, then coerce the whole argument sequence. `some` is the answer, `none` in

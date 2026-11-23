@@ -260,6 +260,16 @@ answer as `decode` followed by `coerce`. The Rust decoder then transcribes `deco
 as `is_subtype` transcribes `decSubtype`, and the theorem is what says the one pass is
 the spec.
 
+As built ([lean/Candid/DecodeAt.lean](../lean/Candid/DecodeAt.lean)): `decodeValueAt`
+follows `coerce` case for case, reading where `coerce` is handed a value -- a scalar read
+at the sender's type and coerced, an `opt`, `vec`, `record` or `variant` part by part.
+Once a value's outcome is decided, it reads on with `decodeValue` to the value's end, so
+every byte is read and every value counted once, in `decode`'s order, with `decode`'s
+errors. `decodeAt_eq` -- equal to `decode` then `coerceArguments`, the same error at the
+same byte included -- is stated, and checked by the oracle on every `decode` and `coerce`
+vector and on generated messages built so that a failed value has more to skip; it is
+not yet proved.
+
 ### Order of work
 
 1. `candid_value`, and writing values. A `decode` vector's values are the receiver's,
