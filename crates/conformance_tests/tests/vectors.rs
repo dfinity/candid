@@ -4,13 +4,16 @@
 //!   carries types too, and the format promises they are well formed
 //!   (`conformance/README.md`), so each of those tables is checked as well: thousands of
 //!   tables the model accepts, which `RawTypeTable::check` must accept too.
-//! - `candid_binary` reads message headers so far. Every message a `decode` vector
-//!   accepts, or calls costly, has a header it must accept; a message the vector rejects
-//!   may be rejected for its header or for its values, so only the count of those whose
-//!   header is already rejected is reported. And every table above is written in a
-//!   message with no arguments and read back, which must give the same table. (Writing
-//!   the roots as argument types too waits for values: a message with arguments cannot
-//!   be finished without them.)
+//! - `candid_binary` reads message headers, and writes values. Every message a `decode`
+//!   vector accepts, or calls costly, has a header it must accept; a message the vector
+//!   rejects may be rejected for its header or for its values, so only the count of
+//!   those whose header is already rejected is reported. Every table above is written in
+//!   a message with no arguments and read back, which must give the same table.
+//! - `candid_value` reads every `<value>`, and with `candid_binary` writes it at the type
+//!   the vector says it has: a `coerce` vector's value at `from` and its expected value at
+//!   `to`, and a `decode` or `parse` vector's expected values at its types. Where a
+//!   `decode` vector's types are its message's own header and nothing in it was coerced,
+//!   the values must give back the message's bytes (`crates/README.md`, "Order of work").
 //!
 //! Like a runner, this reads strictly: an unknown key, kind or name is an error, never
 //! skipped.
@@ -18,9 +21,11 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use candid_binary::{Encode, Encoder, Header};
 use candid_types::{
     Annotation, Composite, FieldId, Primitive, RawTypeTable, Slot, TypeRef, TypeTable,
 };
+use candid_value::{Float32, Float64, Int, Nat, Principal, Record};
 use serde_json::{Map, Value};
 
 type Json = Map<String, Value>;
@@ -60,8 +65,12 @@ fn conformance_vectors() {
         "hash",
         "wellformed",
         "subtype",
-        "decode (header)",
+        "decode (costly; header)",
         "decode (rejected by the header)",
+        "decode (values give back the bytes)",
+        "decode (not in shortest form)",
+        "coerce (values written)",
+        "parse (values written)",
     ] {
         assert!(
             asked.get(kind).copied().unwrap_or(0) > 0,
@@ -113,7 +122,12 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
             let v = obj(vector, &["id", "kind", "value", "from", "to", "expect"]);
             well_formed_type(&v["from"])?;
             well_formed_type(&v["to"])?;
-            Ok("coerce (types only)")
+            // The value has type `from`, and an expected value has type `to`.
+            written_at(&v["from"], &v["value"])?;
+            if v["expect"] != "reject" {
+                written_at(&v["to"], &obj(&v["expect"], &["value"])["value"])?;
+            }
+            Ok("coerce (values written)")
         }
         "decode" => {
             let v = obj(vector, &["id", "kind", "bytes", "types", "expect"]);
@@ -129,15 +143,39 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
                     "decode (rejected, header accepted)"
                 });
             }
-            header.map_err(|e| format!("the header is rejected: {e}"))?;
-            Ok("decode (header)")
+            let header = header.map_err(|e| format!("the header is rejected: {e}"))?;
+            if v["expect"] == "costly" {
+                return Ok("decode (costly; header)");
+            }
+            let values = read_values(&obj(&v["expect"], &["values"])["values"])?;
+            let receiver = read_header(&v["types"])?;
+            let written = write(receiver.clone(), &values)
+                .map_err(|e| format!("the expected values cannot be written: {e}"))?;
+            // Where the receiver's header is the message's, nothing was coerced, and the
+            // values give back the bytes -- unless the message has a future type, whose
+            // value is skipped, or is not in shortest form.
+            if *header.header() != receiver || has_future(receiver.table()) {
+                return Ok("decode (header; values written)");
+            }
+            if written != bytes {
+                agree(NOT_SHORTEST.contains(&v["id"].as_str().unwrap()), || {
+                    format!("the values are written as {}", to_hex(&written))
+                })?;
+                return Ok("decode (not in shortest form)");
+            }
+            Ok("decode (values give back the bytes)")
         }
         "parse" => {
             let v = obj(vector, &["id", "kind", "text", "types", "expect"]);
             let types = obj(&v["types"], &["table", "roots"]);
             let roots = types["roots"].as_array().ok_or("roots")?;
             well_formed_types(&types["table"], roots.iter())?;
-            Ok("parse (types only)")
+            if v["expect"] != "reject" {
+                let values = read_values(&obj(&v["expect"], &["values"])["values"])?;
+                write(read_header(&v["types"])?, &values)
+                    .map_err(|e| format!("the expected values cannot be written: {e}"))?;
+            }
+            Ok("parse (values written)")
         }
         "did" => {
             let keys: &[&str] = if vector.get("files").is_some() {
@@ -167,6 +205,156 @@ fn ask(vector: &Value) -> Result<&'static str, String> {
         }
         other => Err(format!("unknown kind {other:?}")),
     }
+}
+
+/// The `decode` vectors whose message is not in shortest form, so that writing their
+/// values gives other bytes. Each is listed by hand, from its id, so that a writer that
+/// gets a value wrong is not excused by a list built from what it writes.
+const NOT_SHORTEST: &[&str] = &[
+    "decode: nat with redundant continuation bytes",
+    "decode: a type reference with redundant continuation bytes",
+    "decode: an entry's opcode with redundant continuation bytes",
+    "decode: a vector length with redundant continuation bytes",
+    "decode: a vector length of zero in ten bytes",
+    "prim.test.did: overlong typ table length",
+    "prim.test.did: overlong arg length",
+    "prim.test.did: nat: leb overlong #33",
+    "prim.test.did: nat: leb overlong #34",
+    "prim.test.did: int: leb overlong (0s)",
+    "prim.test.did: int: leb overlong (1s)",
+    "prim.test.did: text: overlong length leb",
+];
+
+/// Write `values` in a message with `header`.
+fn write(header: Header, values: &[candid_value::Value]) -> Result<Vec<u8>, String> {
+    let mut encoder = Encoder::new(header);
+    for v in values {
+        let writer = encoder.argument().map_err(|e| e.to_string())?;
+        v.encode(writer).map_err(|e| e.to_string())?;
+    }
+    encoder.finish().map_err(|e| e.to_string())
+}
+
+/// Write a `<value>` at a `<type>`: it must have the type.
+fn written_at(t: &Value, value: &Value) -> Result<(), String> {
+    let (table, root) = checked_type(t)?;
+    let header = Header::new(table, vec![root]).map_err(|e| e.to_string())?;
+    write(header, &[read_value(value)?])
+        .map(drop)
+        .map_err(|e| format!("{value} cannot be written: {e}"))
+}
+
+fn has_future(table: &TypeTable) -> bool {
+    table
+        .entries()
+        .iter()
+        .any(|e| matches!(e, Composite::Future { .. }))
+}
+
+/// A `<types>`, as a header.
+fn read_header(types: &Value) -> Result<Header, String> {
+    let types = obj(types, &["table", "roots"]);
+    let table = read_table(&types["table"])?
+        .check()
+        .map_err(|e| e.to_string())?;
+    let roots = read_slots(&types["roots"])?;
+    Header::new(table, roots).map_err(|e| e.to_string())
+}
+
+fn read_values(v: &Value) -> Result<Vec<candid_value::Value>, String> {
+    v.as_array()
+        .ok_or("values")?
+        .iter()
+        .map(read_value)
+        .collect()
+}
+
+/// A `<value>`.
+fn read_value(v: &Value) -> Result<candid_value::Value, String> {
+    use candid_value::Value as V;
+    let o = match v {
+        Value::Null => return Ok(V::Null),
+        Value::Bool(b) => return Ok(V::Bool(*b)),
+        Value::Object(o) => o,
+        _ => return Err(format!("not a value: {v}")),
+    };
+    let [(key, v)] = o.iter().collect::<Vec<_>>()[..] else {
+        return Err(format!("a value with more than one key: {v}"));
+    };
+    let text = || v.as_str().ok_or_else(|| format!("{key} is not a string"));
+    fn number<T: std::str::FromStr>(s: &str) -> Result<T, String> {
+        s.parse()
+            .map_err(|_| format!("not a number in range: {s:?}"))
+    }
+    fn principal(v: &Value) -> Result<Principal, String> {
+        let bytes = hex(v.as_str().ok_or("principal")?)?;
+        if bytes.len() > 29 {
+            return Err("a principal of more than 29 bytes".into());
+        }
+        Ok(Principal::from_slice(&bytes))
+    }
+    Ok(match key.as_str() {
+        "nat" => V::Nat(number::<Nat>(text()?)?),
+        "int" => V::Int(number::<Int>(text()?)?),
+        "nat8" => V::Nat8(number(text()?)?),
+        "nat16" => V::Nat16(number(text()?)?),
+        "nat32" => V::Nat32(number(text()?)?),
+        "nat64" => V::Nat64(number(text()?)?),
+        "int8" => V::Int8(number(text()?)?),
+        "int16" => V::Int16(number(text()?)?),
+        "int32" => V::Int32(number(text()?)?),
+        "int64" => V::Int64(number(text()?)?),
+        "float32" => V::Float32(Float32::from_bits(
+            u32::from_str_radix(text()?, 16).map_err(|e| e.to_string())?,
+        )),
+        "float64" => V::Float64(Float64::from_bits(
+            u64::from_str_radix(text()?, 16).map_err(|e| e.to_string())?,
+        )),
+        "text" => V::Text(text()?.to_string()),
+        "opt" => V::Opt(Box::new(read_value(v)?)),
+        "vec" => V::Vec(read_values(v)?),
+        "record" => {
+            let fields = v
+                .as_array()
+                .ok_or("record")?
+                .iter()
+                .map(|f| {
+                    let [id, value] = f.as_array().ok_or("field")?.as_slice() else {
+                        return Err("field is not a pair".to_string());
+                    };
+                    Ok((field_id(id)?, read_value(value)?))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            // The format promises ascending ids; a record that would need sorting is not
+            // in the format.
+            agree(fields.windows(2).all(|w| w[0].0 < w[1].0), || {
+                "record fields not in ascending id".to_string()
+            })?;
+            V::Record(Record::from_fields(fields).map_err(|e| e.to_string())?)
+        }
+        "variant" => {
+            let [id, value] = v.as_array().ok_or("variant")?.as_slice() else {
+                return Err("variant is not a pair".into());
+            };
+            V::Variant(field_id(id)?, Box::new(read_value(value)?))
+        }
+        "principal" => V::Principal(principal(v)?),
+        "service" => V::Service(principal(v)?),
+        "func" => {
+            let [service, method] = v.as_array().ok_or("func")?.as_slice() else {
+                return Err("func is not a pair".into());
+            };
+            V::Func(
+                principal(service)?,
+                method.as_str().ok_or("method")?.to_string(),
+            )
+        }
+        other => return Err(format!("unknown value {other:?}")),
+    })
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn agree(ok: bool, why: impl FnOnce() -> String) -> Result<(), String> {

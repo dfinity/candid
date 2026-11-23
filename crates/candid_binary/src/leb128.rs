@@ -115,10 +115,104 @@ pub(crate) fn write_signed(out: &mut Vec<u8>, mut i: i64) {
     }
 }
 
+/// Unsigned LEB128, shortest form, of the number whose base-256 digits `le` holds, least
+/// significant first. Trailing zero bytes are allowed, and add nothing.
+pub(crate) fn write_unsigned_bytes(out: &mut Vec<u8>, le: &[u8]) {
+    let significant = le.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
+    let width = match le[..significant].last() {
+        Some(&top) => significant * 8 - top.leading_zeros() as usize,
+        None => 0,
+    };
+    write_groups(out, le, 0, width);
+}
+
+/// Signed LEB128, shortest form, of the number `le` holds in two's complement, least
+/// significant byte first; the top bit of the last byte is the sign, and no bytes is 0.
+/// Trailing bytes that only repeat the sign are allowed, and add nothing.
+pub(crate) fn write_signed_bytes(out: &mut Vec<u8>, le: &[u8]) {
+    let fill = match le.last() {
+        Some(&top) if top & 0x80 != 0 => 0xff,
+        _ => 0x00,
+    };
+    let significant = le.iter().rposition(|&b| b != fill).map_or(0, |i| i + 1);
+    // The bits up to the highest that differs from the sign, and one more for the sign.
+    let width = match le[..significant].last() {
+        Some(&top) => significant * 8 - (top ^ fill).leading_zeros() as usize + 1,
+        None => 1,
+    };
+    write_groups(out, le, fill, width);
+}
+
+/// The low `width` bits of `le`, extended with `fill`'s bits, in groups of seven: at least
+/// one group, each but the last with its continuation bit set.
+fn write_groups(out: &mut Vec<u8>, le: &[u8], fill: u8, width: usize) {
+    let groups = width.div_ceil(7).max(1);
+    for g in 0..groups {
+        let (k, shift) = ((7 * g) / 8, (7 * g) % 8);
+        let low = u16::from(le.get(k).copied().unwrap_or(fill));
+        let high = u16::from(le.get(k + 1).copied().unwrap_or(fill));
+        let group = ((high << 8 | low) >> shift) as u8 & 0x7f;
+        out.push(if g + 1 < groups { group | 0x80 } else { group });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloc::vec;
+
+    #[test]
+    fn bytes_agree_with_fixed_width() {
+        let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut samples = vec![0, 1, 63, 64, 127, 128, u64::MAX, i64::MAX as u64, 1 << 63];
+        for _ in 0..10_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            // Every width, not only the wide numbers a uniform sample gives.
+            samples.push(state >> (state % 64));
+        }
+        for n in samples {
+            let mut padded = n.to_le_bytes().to_vec();
+            padded.extend([0, 0]);
+            let mut got = Vec::new();
+            write_unsigned_bytes(&mut got, &padded);
+            assert_eq!(got, unsigned(n), "{n}");
+
+            let i = n as i64;
+            for le in [
+                i.to_le_bytes().to_vec(),
+                i128::from(i).to_le_bytes().to_vec(),
+            ] {
+                let mut got = Vec::new();
+                write_signed_bytes(&mut got, &le);
+                assert_eq!(got, signed(i), "{i}");
+            }
+        }
+        let mut got = Vec::new();
+        write_unsigned_bytes(&mut got, &[]);
+        write_signed_bytes(&mut got, &[]);
+        assert_eq!(got, [0, 0]);
+    }
+
+    #[test]
+    fn bytes_past_64_bits() {
+        let mut got = Vec::new();
+        // 2^64: ten groups of zero bits, then a one.
+        write_unsigned_bytes(&mut got, &[0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        assert_eq!(
+            got,
+            [0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02]
+        );
+        let mut got = Vec::new();
+        // -2^64 in two's complement.
+        write_signed_bytes(&mut got, &[0, 0, 0, 0, 0, 0, 0, 0, 0xff]);
+        assert_eq!(
+            got,
+            [0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x7e]
+        );
+        assert_eq!(read_signed(&got), Some((Signed::Below, 10)));
+    }
 
     fn unsigned(n: u64) -> Vec<u8> {
         let mut out = Vec::new();

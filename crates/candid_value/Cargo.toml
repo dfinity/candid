@@ -1,0 +1,24 @@
+[package]
+name = "candid_value"
+version = "0.0.0"
+description = "Candid's dynamic value: any value of any Candid type"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+candid_binary.workspace = true
+candid_types.workspace = true
+ic_principal.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+
+[features]
+# `From` and `Into` between `Nat`/`Int` and `num-bigint` 0.4's `BigUint`/`BigInt`. A later
+# `num-bigint` gets a feature of its own beside this one (README.md, "candid_value").
+num-bigint-04 = []
+
+[lints]
+workspace = true

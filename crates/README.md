@@ -1,17 +1,21 @@
 # `crates/` — redesigned Rust implementation
 
-**Status: `candid_types` and `candid_binary` started.** In a workspace of their own
+**Status: `candid_types`, `candid_binary` and `candid_value` started.** In a workspace of their own
 ([Cargo.toml](Cargo.toml)):
 
 - `candid_types`: the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
   and [Hash.lean](../lean/Candid/Hash.lean), and the subtyping of
   [Subtype.lean](../lean/Candid/Subtype.lean);
-- `candid_binary`: so far the header of a message -- its type table and argument types
-  -- from [Wire.lean](../lean/Candid/Wire.lean), read and written;
+- `candid_binary`: from [Wire.lean](../lean/Candid/Wire.lean), the header of a message
+  -- its type table and argument types -- read and written, and its values written;
+- `candid_value`: the dynamic value of [Value.lean](../lean/Candid/Value.lean), which
+  `candid_binary` writes;
 - `conformance_tests`: not a library, but the one test that reads
   [conformance/vectors/](../conformance/vectors/) and asks each crate what it can answer:
   the `hash`, `wellformed` and `subtype` vectors, every table the other vectors promise
-  is well formed, and the header of every `decode` vector's message.
+  is well formed, the header of every `decode` vector's message, and every value in a
+  vector written at its type -- and where nothing was coerced, giving back the vector's
+  bytes.
 
 Nothing here is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this
 exists.
@@ -93,8 +97,9 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
 
 ## Values
 
-The plan for the value half of `candid_binary`, and for `candid_value`. Not built yet;
-this section is what review agrees on before it is.
+The plan for the value half of `candid_binary`, and for `candid_value`. Writing values,
+and `candid_value`, are built (step 1 of the [order of work](#order-of-work)); reading
+them is not yet.
 
 ### Two traits, one engine
 
@@ -182,6 +187,17 @@ values do not have its types is not a message. Records are written through
 `TypeTable` keeps them in, and the order a derive can sort its fields into at compile
 time. A variant is written by its id; the writer finds the index. Numbers are written in
 their shortest form.
+
+As built: `writer.null()` is the one `null` of `candid_value`, written as its type says
+-- nothing at `null` and `reserved`, `00` at an `opt`, `00 00` at a future type -- and
+`writer.opt()` is the present one. `nat` and `int` are given as their bytes
+(`writer.nat(&n.to_le_bytes())`), so `candid_binary` needs no big-number crate. A
+`vec nat8` can be written whole, with `writer.blob(bytes)`, which writes the bytes
+`writer.vec(len)` and a `nat8` each would. And every value handed out is written: each
+writer knows how many values were owed when it was made, so a writer dropped unwritten,
+or one whose error was ignored, is found by the writer around it at its next call, and
+the message cannot be finished (`EncodeError::Unfinished`). That takes one counter, not a
+stack: the writers themselves are the stack, and the borrow checker keeps them in order.
 
 ### `candid_value`
 
