@@ -5,9 +5,11 @@
 //! in the message, so that the checks the spec asks of a whole message are theirs, not
 //! their callers': an error position is always an offset in the whole message, an
 //! encoder finishes a message only once every argument has its value, and a decoder will
-//! reject bytes after the last value. So far they read and write only the [`Header`]:
-//! the type table and the argument types. Values, and decoding them at the receiver's
-//! types -- which is coercion (`lean/Spec/Types.md`, Section 6) -- come next.
+//! reject bytes after the last value. A message starts with its [`Header`]: the type
+//! table and the argument types. An encoder then writes a value for each argument, through
+//! a [`ValueWriter`], which a type drives by implementing [`Encode`]. A decoder so far
+//! reads only the header; decoding values at the receiver's types -- which is coercion
+//! (`lean/Spec/Types.md`, Section 6) -- comes next.
 //!
 //! A message is read from a `&[u8]` and written to a `Vec<u8>`. A message always arrives
 //! whole, and decoding needs all of it at hand: the `opt` rule goes back over bytes it
@@ -30,8 +32,10 @@ mod error;
 mod header;
 mod leb128;
 mod reader;
+mod writer;
 
 pub use decoder::{Decoder, Limits};
 pub use encoder::Encoder;
 pub use error::{DecodeError, EncodeError, Rejection, UnresolvedArgument};
 pub use header::Header;
+pub use writer::{Encode, RecordWriter, ValueWriter, VecWriter};

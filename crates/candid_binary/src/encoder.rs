@@ -4,17 +4,30 @@ use alloc::vec::Vec;
 
 use crate::error::EncodeError;
 use crate::header::Header;
+use crate::writer::{Sink, ValueWriter};
 
 /// A message being written: its header, then a value for each argument type in order.
 ///
-/// So far it writes only the header, so only a message with no arguments can be
-/// finished. Writing values comes next.
+/// [`Encoder::argument`] gives the writer for each value in turn, and
+/// [`Encoder::finish`] gives the message once every one is written.
+///
+/// ```
+/// # use candid_binary::{Encoder, Header};
+/// # use candid_types::{Slot, TypeTable};
+/// let header = Header::new(TypeTable::default(), vec![Slot::NAT, Slot::TEXT]).unwrap();
+/// let mut encoder = Encoder::new(header);
+/// encoder.argument()?.nat(&[5])?;
+/// encoder.argument()?.text("hi")?;
+/// let bytes = encoder.finish()?;
+/// assert_eq!(bytes, b"DIDL\x00\x02\x7d\x71\x05\x02hi");
+/// # Ok::<(), candid_binary::EncodeError>(())
+/// ```
 #[derive(Clone, Debug)]
 pub struct Encoder {
-    out: Vec<u8>,
+    sink: Sink,
     header: Header,
-    /// How many values have been written.
-    written: usize,
+    /// How many arguments have been handed a writer.
+    next: usize,
 }
 
 impl Encoder {
@@ -29,9 +42,9 @@ impl Encoder {
     pub fn with_buffer(header: Header, mut out: Vec<u8>) -> Self {
         header.encode(&mut out);
         Encoder {
-            out,
+            sink: Sink { out, owed: 0 },
             header,
-            written: 0,
+            next: 0,
         }
     }
 
@@ -40,16 +53,35 @@ impl Encoder {
         &self.header
     }
 
+    /// The writer for the next argument's value, once the one before it is written.
+    pub fn argument(&mut self) -> Result<ValueWriter<'_>, EncodeError> {
+        if self.sink.owed != 0 {
+            return Err(EncodeError::Unfinished);
+        }
+        let types = self.header.types();
+        let Some(&slot) = types.get(self.next) else {
+            return Err(EncodeError::TooManyArguments {
+                expected: types.len(),
+            });
+        };
+        self.next += 1;
+        self.sink.owed = 1;
+        Ok(ValueWriter::new(&mut self.sink, self.header.table(), slot))
+    }
+
     /// The finished message, once every argument has its value.
     pub fn finish(self) -> Result<Vec<u8>, EncodeError> {
+        if self.sink.owed != 0 {
+            return Err(EncodeError::Unfinished);
+        }
         let expected = self.header.types().len();
-        if self.written < expected {
+        if self.next < expected {
             return Err(EncodeError::MissingArguments {
                 expected,
-                written: self.written,
+                written: self.next,
             });
         }
-        Ok(self.out)
+        Ok(self.sink.out)
     }
 }
 
@@ -76,6 +108,18 @@ mod tests {
             .finish()
             .unwrap();
         assert_eq!(bytes, b"xDIDL\x00\x00");
+    }
+
+    #[test]
+    fn no_value_past_the_last_argument() {
+        let header = Header::new(TypeTable::default(), vec![Slot::NULL]).unwrap();
+        let mut encoder = Encoder::new(header);
+        encoder.argument().unwrap().null().unwrap();
+        assert_eq!(
+            encoder.argument().map(drop),
+            Err(EncodeError::TooManyArguments { expected: 1 })
+        );
+        assert_eq!(encoder.finish().unwrap(), b"DIDL\x00\x01\x7f");
     }
 
     #[test]

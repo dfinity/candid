@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use candid_types::{MalformedTable, Primitive};
+use candid_types::{FieldId, MalformedTable, Primitive, Slot};
 
 /// Why a message was rejected, and where: the offset of the byte the problem starts at.
 ///
@@ -153,7 +153,8 @@ impl fmt::Display for UnresolvedArgument {
 
 impl core::error::Error for UnresolvedArgument {}
 
-/// Why a message could not be finished.
+/// Why a message could not be written: a value that does not have its type, or one that
+/// was not written at all.
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum EncodeError {
@@ -162,6 +163,50 @@ pub enum EncodeError {
         /// How many arguments the header has.
         expected: usize,
         /// How many values were written.
+        written: usize,
+    },
+    /// A value was asked for past the header's last argument.
+    TooManyArguments {
+        /// How many arguments the header has.
+        expected: usize,
+    },
+    /// A value was begun and not finished: its writer was dropped, or failed and the
+    /// failure was ignored. The message is missing that value, and cannot be finished.
+    Unfinished,
+    /// A value that does not have its type: the `value` named, at `slot`.
+    NotOfType {
+        /// The type the value was written at.
+        slot: Slot,
+        /// What was written: the Candid word for it, such as `nat` or `record`.
+        value: &'static str,
+    },
+    /// A principal, or a reference's, of more than 29 bytes.
+    PrincipalTooLong {
+        /// How many bytes it has.
+        len: usize,
+    },
+    /// A record field that is not the next in the type's order, or not the type's at all.
+    UnexpectedField {
+        /// The field written.
+        id: FieldId,
+        /// The field that comes next, or `None` if every field has been written.
+        expected: Option<FieldId>,
+    },
+    /// A record finished without this field, and any after it.
+    MissingField {
+        /// The first field not written.
+        id: FieldId,
+    },
+    /// A variant written at an alternative its type does not have.
+    NoSuchAlternative {
+        /// The alternative.
+        id: FieldId,
+    },
+    /// A vector given more or fewer values than its length.
+    ElementCount {
+        /// The length it was begun with.
+        len: usize,
+        /// How many values it was given.
         written: usize,
     },
 }
@@ -173,6 +218,32 @@ impl fmt::Display for EncodeError {
                 f,
                 "the header has {expected} arguments, and {written} values were written"
             ),
+            EncodeError::TooManyArguments { expected } => {
+                write!(f, "a value past the header's {expected} arguments")
+            }
+            EncodeError::Unfinished => f.write_str("a value was begun and not finished"),
+            EncodeError::NotOfType { slot, value } => {
+                write!(f, "a {value} value where the type is {slot:?}")
+            }
+            EncodeError::PrincipalTooLong { len } => {
+                write!(f, "a principal of {len} bytes, more than 29")
+            }
+            EncodeError::UnexpectedField {
+                id,
+                expected: Some(next),
+            } => {
+                write!(f, "field {id} written where field {next} comes next")
+            }
+            EncodeError::UnexpectedField { id, expected: None } => {
+                write!(f, "field {id} written after the record's last field")
+            }
+            EncodeError::MissingField { id } => write!(f, "a record without its field {id}"),
+            EncodeError::NoSuchAlternative { id } => {
+                write!(f, "the variant has no alternative {id}")
+            }
+            EncodeError::ElementCount { len, written } => {
+                write!(f, "a vector of length {len} given {written} values")
+            }
         }
     }
 }
