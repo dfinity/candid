@@ -258,9 +258,14 @@ impl<'w> ValueWriter<'w> {
     }
 
     /// A `vec nat8`, all at once: the bytes [`ValueWriter::vec`] and a
-    /// [`ValueWriter::nat8`] for each would write.
+    /// [`ValueWriter::nat8`] for each would write. So no bytes is the empty vector, which
+    /// has every vector type.
     pub fn blob(self, bytes: &[u8]) -> Result<(), EncodeError> {
-        if self.composite() != Some(&Composite::Vec(Slot::NAT8)) {
+        let accepted = match self.composite() {
+            Some(&Composite::Vec(element)) => bytes.is_empty() || element == Slot::NAT8,
+            _ => false,
+        };
+        if !accepted {
             return Err(self.not_of_type("blob"));
         }
         write_bytes(&mut self.sink.out, bytes);
@@ -519,8 +524,15 @@ mod tests {
             one(vec![], Slot::PRINCIPAL, |w| w.principal(&[0; 30])),
             Err(EncodeError::PrincipalTooLong { len: 30 })
         );
-        // A blob is a `vec nat8` and nothing else.
-        assert!(one(vec![Composite::Vec(Slot::NAT16)], r(0), |w| w.blob(&[1])).is_err());
+        // A blob is a `vec nat8` and nothing else -- but the empty one is every vector.
+        let entries = vec![Composite::Vec(Slot::NAT16), Composite::Vec(Slot::EMPTY)];
+        assert!(one(entries.clone(), r(0), |w| w.blob(&[1])).is_err());
+        for t in [r(0), r(1)] {
+            let empty_vec = one(entries.clone(), t, |w| w.vec(0)?.finish());
+            assert_eq!(one(entries.clone(), t, |w| w.blob(&[])), empty_vec);
+            assert_eq!(empty_vec, Ok(vec![0]));
+        }
+        assert!(one(vec![], Slot::NAT, |w| w.blob(&[])).is_err());
     }
 
     #[test]

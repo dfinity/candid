@@ -391,6 +391,12 @@ mod tests {
         let vec = Value::Opt(Box::new(Value::Vec(vec![Value::Nat8(7)])));
         assert_eq!(blob, encode(entries.clone(), r(1), &vec));
         assert!(blob.unwrap().ends_with(&[1, 1, 7]));
+        // Equal values write alike: the empty blob is the empty vector, of any element.
+        let nat16s = vec![Composite::Vec(Slot::NAT16)];
+        assert_eq!(
+            encode(nat16s.clone(), r(0), &Value::Blob(vec![])),
+            encode(nat16s, r(0), &Value::Vec(vec![]))
+        );
 
         let record = Value::Record(
             Record::from_fields([
