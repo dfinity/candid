@@ -518,6 +518,28 @@ mod tests {
     }
 
     #[test]
+    fn members_out_of_order_point_at_their_list() {
+        // `record {1 : nat; 0 : nat}`: the field list, after the opcode at 5, is at 6.
+        let e = Header::decode(&mut Reader::new(&message(&[
+            0x01, 0x6c, 0x02, 0x01, 0x7d, 0x00, 0x7d, 0x00,
+        ])))
+        .unwrap_err();
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (6, &Rejection::FieldsOutOfOrder)
+        );
+        // `service {b : 0; a : 0}`: the method list is at 6 too, not at the opcode.
+        let e = Header::decode(&mut Reader::new(&message(&[
+            0x01, 0x69, 0x02, 0x01, 0x62, 0x00, 0x01, 0x61, 0x00, 0x00,
+        ])))
+        .unwrap_err();
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (6, &Rejection::MethodsOutOfOrder)
+        );
+    }
+
+    #[test]
     fn a_malformed_table_is_rejected() {
         // `vec 1` in a table of one entry.
         let got = decode(&message(&[0x01, 0x6d, 0x01, 0x00])).unwrap_err();

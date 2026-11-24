@@ -68,10 +68,11 @@ jobs:
           lake exe oracle differential ../crates/conformance_tests/tests/differential.json
           git diff --exit-code -- ../crates/conformance_tests/tests/differential.json
 
-  # `candid_binary` held to the model on far more messages than are committed, from a
-  # seed that changes with every run: fuzzing, with the model as the judge. A failure
-  # is a disagreement between the two, and the log names the seed that reproduces it
-  # (`crates/conformance_tests/tests/differential.rs`).
+  # `candid_binary` held to the model on far more messages than are committed: fuzzing,
+  # with the model as the judge. On a pull request the seed is fixed, so that its result
+  # is the PR's and not the run's; on a push it changes every time, so the branches are
+  # fuzzed further as they move. A failure is a disagreement between the two, and the
+  # log names the seed that reproduces it (`crates/conformance_tests/tests/differential.rs`).
   differential:
     runs-on: ubuntu-latest
     steps:
@@ -91,8 +92,10 @@ jobs:
       - name: write cases
         working-directory: lean
         run: |
-          echo "seed $GITHUB_RUN_ID"
-          lake exe oracle differential "$RUNNER_TEMP/cases.json" "$GITHUB_RUN_ID" 40000
+          echo "seed $SEED"
+          lake exe oracle differential "$RUNNER_TEMP/cases.json" "$SEED" 40000
+        env:
+          SEED: ${{ github.event_name == 'pull_request' && '1' || github.run_id }}
       - name: candid_binary agrees with the model
         run: cargo test --locked --manifest-path crates/Cargo.toml -p conformance_tests --test differential
         env:

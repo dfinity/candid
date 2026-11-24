@@ -193,13 +193,18 @@ def RawTypeTable.methodsDenoteFuncs (t : RawTypeTable) : Composite → Bool
       | .primitive _ => false
   | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .future _ _ => true
 
+/-- One entry of `t` is well formed: alone, and as `methodsDenoteFuncs` looks through
+`t`. -/
+def RawTypeTable.entryWellFormed (t : RawTypeTable) (c : Composite) : Bool :=
+  c.wellFormed t.size && t.methodsDenoteFuncs c
+
 def RawTypeTable.wellFormed (t : RawTypeTable) : Bool :=
-  t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c
+  t.entries.all t.entryWellFormed
 
 /-- The first entry that is not well formed, if any: where a decoder says a table is
-malformed. -/
+malformed. `none` exactly when the table is well formed. -/
 def RawTypeTable.firstMalformed? (t : RawTypeTable) : Option Nat :=
-  t.entries.toList.findIdx? fun c => !(c.wellFormed t.size && t.methodsDenoteFuncs c)
+  t.entries.toList.findIdx? (!t.entryWellFormed ·)
 
 /-! ## The validated table
 

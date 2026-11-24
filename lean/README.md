@@ -460,7 +460,7 @@ them or unrelated ones, within a limit set to the value -- each with the exact a
 (`crates/conformance_tests/tests/differential.rs`): the same values, failure or
 undefined coercion, and for a rejected message the same rejection at the same byte. A
 small corpus from a fixed seed is committed and checked to be up to date; CI also runs
-40,000 messages from a seed that changes with every run. The self-test checks
+40,000 messages, from a fixed seed on a pull request and a new one on every push. The self-test checks
 `decodeAt_eq` on the corpus too.
 
 **Rejections have kinds.** `DecodeError` carries a `Rejection`, named after

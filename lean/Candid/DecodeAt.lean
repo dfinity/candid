@@ -279,18 +279,23 @@ def decodeArgumentsAt (A B : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos
       | .error e => .error e
       | .ok ((_, used), ⟨q, hq⟩) => .ok ((o.map fun _ => [], used), ⟨q, by omega, hq.2⟩)
 
+/-- `decodeAt`, with how many values it decoded: the count a limit is checked against. -/
+def decodeAtCounting (bs : ByteArray) (B : TypeTable) (us : List Slot)
+    (limit : Option Nat := none) : Except DecodeError (Outcome (List Value) × Nat) := do
+  let ⟨table, types, pos, hpos⟩ ← decodeHeader bs
+  match decodeArgumentsAt table B bs pos hpos limit 0 types us with
+  | .error e => throw e
+  | .ok ((o, used), ⟨q, _⟩) =>
+    finish bs q
+    return (o, used)
+
 /-- A message, read at the expected types `us` in `B`, decoding at most `limit` values:
 its header, then its values in one pass, then nothing. An error is the message's --
 malformed, or past the limit; otherwise the outcome of coercing its arguments. The same
 answer as `decode` then `coerceArguments` (`decodeAt_eq`, in the header). -/
 def decodeAt (bs : ByteArray) (B : TypeTable) (us : List Slot) (limit : Option Nat := none) :
-    Except DecodeError (Outcome (List Value)) := do
-  let ⟨table, types, pos, hpos⟩ ← decodeHeader bs
-  match decodeArgumentsAt table B bs pos hpos limit 0 types us with
-  | .error e => throw e
-  | .ok ((o, _), ⟨q, _⟩) =>
-    finish bs q
-    return o
+    Except DecodeError (Outcome (List Value)) :=
+  (·.1) <$> decodeAtCounting bs B us limit
 
 /-- `deserializeWithin`, in one pass: decode at most `limit` values. `some` is the
 answer, `none` in it a rejected message; `none` alone is the decoder reaching its limit

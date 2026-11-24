@@ -86,10 +86,12 @@ def selfTest : IO UInt32 := do
       IO.println s!"FAIL  {v.id}: {d}"
       problems := problems + 1
   let differential := Differential.cases Differential.corpusSeed Differential.corpusCount
-  for p in Differential.violations differential do
+  let violations := Differential.violations differential
+  for p in violations do
     IO.println s!"FAIL  {p}"
     problems := problems + 1
-  IO.println s!"ok    decodeAt_eq on {differential.length} differential cases"
+  if violations.isEmpty then
+    IO.println s!"ok    decodeAt_eq on {differential.length} differential cases"
   for p in TestDid.violations ++ TestDid.parserViolations do
     IO.println s!"FAIL  test/{p}"
     problems := problems + 1

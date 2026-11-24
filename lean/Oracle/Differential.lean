@@ -24,8 +24,8 @@ which is combinations:
 
 **Deterministic.** The cases come from a seed. `lake exe oracle differential <file>`
 writes the committed corpus from a fixed seed, and CI writes it again and fails on a
-difference, as it does for the vectors. A different seed and count give more cases, for
-a longer run by hand.
+difference, as it does for the vectors. A different seed and count give more cases: CI
+runs 40,000 messages more, and so can a longer run by hand.
 
 The self-test also checks `decodeAt_eq` on every case: these are the messages that
 reach the most combinations, so they are where the one pass is most likely to differ
@@ -40,33 +40,34 @@ open Candid Lean
 
 /-! ## Randomness -/
 
-abbrev Gen := StateM StdGen
+/-- A computation that draws on a seeded generator. -/
+abbrev Generation := StateM StdGen
 
 /-- Uniform in `[0, n)`; `0` if `n` is `0`. -/
-def below (n : Nat) : Gen Nat := do
+def below (n : Nat) : Generation Nat := do
   if n == 0 then return 0
   let (k, g) := randNat (← get) 0 (n - 1)
   set g
   return k
 
 /-- `true` `k` times in `n`. -/
-def chance (k n : Nat) : Gen Bool := return (← below n) < k
+def chance (k n : Nat) : Generation Bool := return (← below n) < k
 
-def pick [Inhabited α] (xs : List α) : Gen α := return xs[← below xs.length]!
+def pick [Inhabited α] (xs : List α) : Generation α := return xs[← below xs.length]!
 
 /-! ## Types -/
 
 /-- A slot in a table of `n` entries. -/
-def slot (n : Nat) : Gen Slot := do
+def slot (n : Nat) : Generation Slot := do
   if n > 0 && (← chance 1 2) then return .ref (← below n)
   return .primitive (← pick Primitive.all)
 
 /-- Fields or alternatives: distinct ids, ascending, a few of them, each with a slot. -/
-def labelled (n : Nat) : Gen (List (FieldId × Slot)) := do
+def labelled (n : Nat) : Generation (List (FieldId × Slot)) := do
   let ids ← (List.range 6).filterM fun _ => chance 1 3
   ids.mapM fun id => return (id.toUInt32, ← slot n)
 
-def composite (n : Nat) : Gen Composite := do
+def composite (n : Nat) : Generation Composite := do
   match ← below 12 with
   | 0 | 1 | 2 => return .opt (← slot n)
   | 3 => return .vec (← slot n)
@@ -78,7 +79,7 @@ def composite (n : Nat) : Gen Composite := do
 
 /-- A service's methods, each a function entry of the table: a method's type must
 denote a function. -/
-def methods (entries : List Composite) : Gen Composite := do
+def methods (entries : List Composite) : Generation Composite := do
   let funcs := (List.range entries.length).filter fun i =>
     match entries[i]? with | some (.func _ _ _) => true | _ => false
   if funcs.isEmpty then return .service []
@@ -86,7 +87,7 @@ def methods (entries : List Composite) : Gen Composite := do
   return .service (← names.mapM fun m => return (m, .ref (← pick funcs)))
 
 /-- A table of up to four entries, and up to three argument types in it. -/
-def types : Gen (RawTypeTable × List Slot) := do
+def types : Generation (RawTypeTable × List Slot) := do
   let n ← below 5
   let entries ← (List.range n).mapM fun _ => composite n
   let entries ← entries.mapM fun
@@ -97,10 +98,10 @@ def types : Gen (RawTypeTable × List Slot) := do
 
 /-! ## Values -/
 
-def someBytes (most : Nat) : Gen (List UInt8) := do
+def someBytes (most : Nat) : Generation (List UInt8) := do
   (List.range (← below (most + 1))).mapM fun _ => return (← below 256).toUInt8
 
-def primitiveValue : Primitive → Gen (Option Value)
+def primitiveValue : Primitive → Generation (Option Value)
   | .null | .reserved => return some .null
   | .empty => return none
   | .bool => return some (.bool (← chance 1 2))
@@ -120,7 +121,7 @@ def primitiveValue : Primitive → Gen (Option Value)
   | .principal => return some (.principal (← someBytes 29))
 
 /-- A value of type `t`, if one is found within `fuel` levels of nesting. -/
-partial def value (T : TypeTable) (fuel : Nat) (t : Slot) : Gen (Option Value) := do
+partial def value (T : TypeTable) (fuel : Nat) (t : Slot) : Generation (Option Value) := do
   match t with
   | .primitive p => primitiveValue p
   | .ref r => match T.lookup? r with
@@ -149,7 +150,7 @@ partial def value (T : TypeTable) (fuel : Nat) (t : Slot) : Gen (Option Value) :
 
 /-! ## Receivers -/
 
-def mapSlotsM (f : Slot → Gen Slot) : Composite → Gen Composite
+def mapSlotsM (f : Slot → Generation Slot) : Composite → Generation Composite
   | .opt t => return .opt (← f t)
   | .vec t => return .vec (← f t)
   | .record fs => return .record (← fs.mapM fun (id, t) => return (id, ← f t))
@@ -159,7 +160,7 @@ def mapSlotsM (f : Slot → Gen Slot) : Composite → Gen Composite
   | c@(.future _ _) => return c
 
 /-- Add a field at an id not taken, or drop one. -/
-def reshape (fs : List (FieldId × Slot)) (n : Nat) : Gen (List (FieldId × Slot)) := do
+def reshape (fs : List (FieldId × Slot)) (n : Nat) : Generation (List (FieldId × Slot)) := do
   if !fs.isEmpty && (← chance 1 2) then
     let k ← below fs.length
     return fs.eraseIdx k
@@ -169,9 +170,9 @@ def reshape (fs : List (FieldId × Slot)) (n : Nat) : Gen (List (FieldId × Slot
 
 /-- One change to a receiver's types, which may append entries to the table. -/
 def change (entries : Array Composite) (roots : List Slot) :
-    Gen (Array Composite × List Slot) := do
+    Generation (Array Composite × List Slot) := do
   let n := entries.size
-  let some_slot (s : Slot) : Gen Slot := do
+  let some_slot (s : Slot) : Generation Slot := do
     if ← chance 1 3 then slot n else return s
   match ← below 7 with
   | 0 =>
@@ -192,12 +193,20 @@ def change (entries : Array Composite) (roots : List Slot) :
     -- An argument added or dropped.
     if !roots.isEmpty && (← chance 1 2) then return (entries, roots.dropLast)
     return (entries, roots ++ [← slot n])
-  | 4 | 5 =>
-    -- An `opt` put around a type: a root, or a slot in an entry.
+  | 4 =>
+    -- An `opt` put around a root.
     if roots.isEmpty then return (entries, roots)
     let k ← below roots.length
-    let entries := entries.push (.opt roots[k]!)
-    return (entries, roots.set k (.ref n))
+    return (entries.push (.opt roots[k]!), roots.set k (.ref n))
+  | 5 =>
+    -- An `opt` put around a type in an entry: a field's, an element's, an alternative's.
+    if n == 0 then return (entries, roots)
+    let i ← below n
+    let slots := entries[i]!.slots
+    if slots.isEmpty then return (entries, roots)
+    let t ← pick slots
+    let c ← mapSlotsM (fun s => pure (if s == t then .ref n else s)) entries[i]!
+    return ((entries.set! i c).push (.opt t), roots)
   | _ =>
     -- An infinite option, `R = opt R`, in place of a root.
     if roots.isEmpty then return (entries, roots)
@@ -205,8 +214,8 @@ def change (entries : Array Composite) (roots : List Slot) :
     return (entries.push (.opt (.ref n)), roots.set k (.ref n))
 
 /-- The receiver's types: the sender's, a variation of them, or unrelated ones. Always
-well formed. -/
-def receiver (sender : RawTypeTable) (roots : List Slot) : Gen TypeSequence := do
+well formed: a change that would leave them malformed is not made, and the others are. -/
+def receiver (sender : RawTypeTable) (roots : List Slot) : Generation TypeSequence := do
   let same : TypeSequence := ⟨sender, roots⟩
   match ← below 8 with
   | 0 => return same
@@ -215,18 +224,18 @@ def receiver (sender : RawTypeTable) (roots : List Slot) : Gen TypeSequence := d
     let s : TypeSequence := ⟨t, rs⟩
     return if s.check?.isSome then s else same
   | _ =>
-    let mut entries := sender.entries
-    let mut rs := roots
+    let mut s := same
     for _ in List.range (1 + (← below 3)) do
-      (entries, rs) ← change entries rs
-    let s : TypeSequence := ⟨{ entries }, rs⟩
-    return if s.check?.isSome then s else same
+      let (entries, rs) ← change s.table.entries s.roots
+      let changed : TypeSequence := ⟨{ entries }, rs⟩
+      if changed.check?.isSome then s := changed
+    return s
 
 /-! ## Messages -/
 
 /-- The message as sent, or damaged: more often in its values, which come after a
 header of `header` bytes, than in the header. -/
-def damage (header : Nat) (bs : List UInt8) : Gen (List UInt8) := do
+def damage (header : Nat) (bs : List UInt8) : Generation (List UInt8) := do
   let inValues ← chance 3 4
   let cut ← if inValues then (header + ·) <$> below (bs.length - header + 1)
     else below (bs.length + 1)
@@ -258,7 +267,7 @@ def reversed? : Composite → Option Composite
 /-- The message with its header written again, one entry's members out of order: what
 damage to single bytes almost never does. -/
 def disorder (A : TypeTable) (roots : List Slot) (header : Nat) (bs : List UInt8) :
-    Gen (List UInt8) := do
+    Generation (List UInt8) := do
   let entries := A.raw.entries.toList
   let candidates := (List.range entries.length).filter fun i =>
     (entries[i]?.bind reversed?).isSome
@@ -269,16 +278,13 @@ def disorder (A : TypeTable) (roots : List Slot) (header : Nat) (bs : List UInt8
 
 /-! ## Answers -/
 
-/-- `decodeAt`'s answer, with how many values it counted if it read the whole message. -/
+/-- `decodeAt`'s answer within `limit`, with how many values it counted if it read the
+whole message. -/
 def answerAt (bs : ByteArray) (B : TypeTable) (us : List Slot) (limit : Nat) :
     Except DecodeError (Outcome (List Value)) × Option Nat :=
-  match decodeHeader bs with
+  match decodeAtCounting bs B us (some limit) with
   | .error e => (.error e, none)
-  | .ok ⟨A, ts, pos, hpos⟩ => match decodeArgumentsAt A B bs pos hpos (some limit) 0 ts us with
-    | .error e => (.error e, none)
-    | .ok ((o, used), ⟨q, _⟩) => match finish bs q with
-      | .error e => (.error e, none)
-      | .ok () => (.ok o, some used)
+  | .ok (o, used) => (.ok o, some used)
 
 def _root_.Candid.Rejection.name : Rejection → String
   | .endOfInput => "endOfInput"
@@ -324,7 +330,7 @@ def Case.toJson (c : Case) : Json :=
     ("limit", .num c.limit), ("answer", answerToJson c.answer)]
 
 /-- A sender's types and values, if the types have values to find. -/
-def sent : Gen (Option (TypeTable × List Slot × ByteArray)) := do
+def sent : Generation (Option (TypeTable × List Slot × ByteArray)) := do
   for _ in List.range 20 do
     let (raw, roots) ← types
     let some A := raw.check | continue
@@ -333,10 +339,27 @@ def sent : Gen (Option (TypeTable × List Slot × ByteArray)) := do
     return some (A, roots, bs)
   return none
 
+/-- A byte that is more often one with a meaning -- a tag, a flag, a small length, the
+edge of LEB128 -- than not. -/
+def someByte : Generation UInt8 := do
+  if ← chance 1 2 then return (← pick [0, 0, 1, 1, 2, 0x1e, 0x7f, 0x80, 0xff] : Nat).toUInt8
+  return (← below 256).toUInt8
+
+/-- A header, then bytes that are not values of its types, chosen at random: so that a
+message reaches the rejections no value of the types does -- an opaque reference, a
+value of `empty`, a record with no value. -/
+def unsent : Generation (Option (TypeTable × List Slot × ByteArray)) := do
+  let (raw, roots) ← types
+  let some A := raw.check | return none
+  let header := magic ++ lebList raw.entries.toList Composite.encode ++ lebList roots Slot.encode
+  let rest ← (List.range (← below 7)).mapM fun _ => someByte
+  return some (A, roots, ⟨(header ++ rest).toArray⟩)
+
 /-- The cases from one message: at the oracle's limit, and if the message is read to its
 end, at exactly the values it has and, sometimes, one fewer. -/
-def casesFrom : Gen (List Case) := do
-  let some (A, roots, bs) ← sent | return []
+def casesFrom : Generation (List Case) := do
+  let message ← if ← chance 1 6 then unsent else sent
+  let some (A, roots, bs) := message | return []
   let header := match decodeHeader bs with
     | .ok h => h.pos
     | .error _ => 0
@@ -350,13 +373,14 @@ def casesFrom : Gen (List Case) := do
   match used with
   | none => return [⟨bs, r, costlyLimit, answer⟩]
   | some used =>
-    let exact : Case := ⟨bs, r, used, (answerAt bs B us used).1⟩
+    -- Within `used`, the answer is the one within the oracle's limit.
+    let exact : Case := ⟨bs, r, used, answer⟩
     if used > 0 && (← chance 1 2) then
       return [exact, ⟨bs, r, used - 1, (answerAt bs B us (used - 1)).1⟩]
     return [exact]
 
 def cases (seed count : Nat) : List Case :=
-  let go : Gen (List Case) := do
+  let go : Generation (List Case) := do
     let mut all := #[]
     for _ in List.range count do
       all := all ++ (← casesFrom).toArray

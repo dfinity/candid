@@ -51,19 +51,25 @@ fn differential() {
         .stack_size(1 << 30)
         .spawn(move || {
             let mut failures = Vec::new();
+            let mut declined = 0;
             for (i, case) in cases.iter().enumerate() {
-                if let Err(why) = check(case) {
-                    failures.push(format!("case {i}: {why}"));
+                match check(case) {
+                    Ok(Verdict::Agrees) => {}
+                    Ok(Verdict::Declined) => declined += 1,
+                    Err(why) => failures.push(format!("case {i}: {why}")),
                 }
             }
-            (cases.len(), failures)
+            (cases.len(), declined, failures)
         })
         .unwrap()
         .join()
         .unwrap();
-    let (total, failures) = failures;
+    let (total, declined, failures) = failures;
     for f in failures.iter().take(30) {
         eprintln!("FAIL  {f}");
+    }
+    if declined > 0 {
+        eprintln!("{declined} of {total} cases declined for a resource limit the model has not");
     }
     assert!(
         failures.is_empty(),
@@ -72,7 +78,15 @@ fn differential() {
     );
 }
 
-fn check(case: &Value) -> Result<(), String> {
+/// How a case went, if not against the model.
+enum Verdict {
+    Agrees,
+    /// Rejected for a resource limit of `candid_binary`'s alone, where the model reads on:
+    /// allowed (`lean/Spec/Binary.md`, Section 9), and counted.
+    Declined,
+}
+
+fn check(case: &Value) -> Result<Verdict, String> {
     let c = obj(case, &["message", "receiver", "limit", "answer"]);
     let bytes = hex(c["message"].as_str().ok_or("message")?)?;
     let receiver = read_header(&c["receiver"])?;
@@ -85,8 +99,17 @@ fn check(case: &Value) -> Result<(), String> {
     let got = match decode(&bytes, &receiver, limits) {
         Ok(got) => got,
         // A future type's opcode past an `i64`: a resource limit of this decoder alone,
-        // which the spec allows wherever the model accepts.
-        Err(e) if *e.rejection() == Rejection::OpcodeOutOfRange => return Ok(()),
+        // allowed wherever the model has not already rejected the message.
+        Err(e) if *e.rejection() == Rejection::OpcodeOutOfRange => {
+            return match want {
+                Answer::Rejected { position, .. } if position <= e.position() => Err(format!(
+                    "{}: declined at {} for an opcode, the model rejects it at {position}",
+                    to_hex(&bytes),
+                    e.position()
+                )),
+                _ => Ok(Verdict::Declined),
+            };
+        }
         Err(e) => rejected(&e),
     };
     agree(got == want, || {
@@ -96,6 +119,7 @@ fn check(case: &Value) -> Result<(), String> {
             c["receiver"]
         )
     })
+    .map(|()| Verdict::Agrees)
 }
 
 /// Read every argument the receiver expects as a `Value`, then finish: the answer, or
