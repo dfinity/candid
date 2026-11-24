@@ -8,6 +8,7 @@
 use crate::error::{DecodeError, Rejection};
 use crate::leb128::{self, Signed};
 
+#[derive(Debug)]
 pub(crate) struct Reader<'a> {
     bytes: &'a [u8],
     position: usize,
@@ -59,6 +60,19 @@ impl<'a> Reader<'a> {
             Some((n, used)) => {
                 self.position += used;
                 Ok(n)
+            }
+            None => self.fail(self.position, Rejection::EndOfInput),
+        }
+    }
+
+    /// The bytes of a LEB128 or SLEB128 number, whatever its size: up to and including the
+    /// first byte without its continuation bit.
+    pub(crate) fn leb128_bytes(&mut self) -> Read<&'a [u8]> {
+        let rest = self.rest();
+        match rest.iter().position(|&b| b < 0x80) {
+            Some(last) => {
+                self.position += last + 1;
+                Ok(&rest[..=last])
             }
             None => self.fail(self.position, Rejection::EndOfInput),
         }

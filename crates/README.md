@@ -6,16 +6,17 @@
 - `candid_types`: the type language of [lean/Candid/Types.lean](../lean/Candid/Types.lean)
   and [Hash.lean](../lean/Candid/Hash.lean), and the subtyping of
   [Subtype.lean](../lean/Candid/Subtype.lean);
-- `candid_binary`: from [Wire.lean](../lean/Candid/Wire.lean), the header of a message
-  -- its type table and argument types -- read and written, and its values written;
+- `candid_binary`: messages, from [Wire.lean](../lean/Candid/Wire.lean) and
+  [DecodeAt.lean](../lean/Candid/DecodeAt.lean): written, and read at the receiver's
+  types, which is coercion;
 - `candid_value`: the dynamic value of [Value.lean](../lean/Candid/Value.lean), which
-  `candid_binary` writes;
+  `candid_binary` writes and reads;
 - `conformance_tests`: not a library, but the one test that reads
   [conformance/vectors/](../conformance/vectors/) and asks each crate what it can answer:
   the `hash`, `wellformed` and `subtype` vectors, every table the other vectors promise
-  is well formed, the header of every `decode` vector's message, and every value in a
-  vector written at its type -- and where nothing was coerced, giving back the vector's
-  bytes.
+  is well formed, every `decode` vector's message read at its types, every `coerce`
+  vector written at `from` and read at `to` -- alone and in context -- and every value in
+  a vector written at its type, giving back the vector's bytes where nothing was coerced.
 
 Nothing here is published to crates.io. See [REWRITE.md](../REWRITE.md) for why this
 exists.
@@ -97,9 +98,9 @@ out of tree:      candid_bindgen_{rust,js,ts,motoko}
 
 ## Values
 
-The plan for the value half of `candid_binary`, and for `candid_value`. Writing values,
-and `candid_value`, are built (step 1 of the [order of work](#order-of-work)); reading
-them is not yet.
+The plan for the value half of `candid_binary`, and for `candid_value`. Built: writing
+values, `candid_value`, Lean's `decodeAt`, and reading values at the receiver's types --
+steps 1 to 3 of the [order of work](#order-of-work).
 
 ### Two traits, one engine
 
@@ -165,17 +166,34 @@ after the last value.
 
 **Results.** Three outcomes, as Section 6.1 of Types.md has them: a value is `Ok(Some(_))`, failure
 is `Ok(None)`, and undefined -- reading a value that does not accept `null` at an
-infinite option -- is an `Err`, like a malformed message and a resource limit. A
+infinite option -- is an `Err`, like a malformed message and a resource limit. It is
+the answer only once the rest of the message is read, as `decodeAt` has it: an error in
+the bytes after it, or a limit they run into, comes first. A
 failure an `opt` does not absorb rejects the message too; `Decoder::argument`'s caller
 gets it as `Ok(None)` and the facade turns it into an error naming the argument.
 
 **Fast paths are specialisations.** `vec nat8` read into a `&[u8]` or `Vec<u8>`, and
 text read into a `&str`, take the bytes in one step. They are the general path with
-the loop unrolled, covered by the same vectors (CLAUDE.md, anti-pattern 6).
+the loop unrolled, covered by the same vectors (CLAUDE.md, anti-pattern 6): the same
+values counted, the same depth checked, and the same error at the same byte.
 
 **References.** A `func` or `service` value coerces only if its type is a subtype of the
 expected one. The decoder caches each answer by the pair of table entries, so a vector
 of a million references costs one subtype check.
+
+As built: the parts of an `opt`, a `vec`, a record and a variant are handed to the
+receiver through closures -- `reader.opt(|inner| ...)`, `reader.record(|fields| ...)`,
+`fields.field(id, |value| ...)` -- and each method reads its value to the end before it
+returns, whatever the closure did. So the readers are the frames of the explicit stack,
+as the writers are, and each knows how far through its value it is: when a receiver
+gives up, the method skips the rest of its own value, and a reader the receiver drops
+unread is skipped by the one that handed it out. Skipping is a loop over a stack of its
+own, which counts and rejects as `decodeValue` does. Once a part fails, nothing more of
+the value is read at the receiver's types, as in `decodeAt`; a record field the receiver
+does not ask for is still read at its type, so the receiver's type decides the record,
+not which fields the receiver keeps. The subtype cache lives for one argument, since the
+next may be at another receiver's table. `nat` and `int` come out as `Natural` and
+`Integer`, which read the number out as bytes or a fixed-size integer.
 
 ### Writing
 
@@ -251,6 +269,24 @@ is `candid_syntax`'s, not this crate's.
 Both are resource limits (Binary.md, Section 9), with defaults generous for any real
 message.
 
+Two costs are bounded but not yet measured or tuned; step 4 settles them:
+
+- **Skipping uses heap, per level of nesting.** Skipping is a loop over a stack of what
+  is left to read, kept on the heap: one entry, about 40 bytes, for each level still
+  open. Each level is a counted value, so the stack is bounded by `values` -- but at the
+  default of 2²², that is up to about 160 MB, more with the `Vec`'s doubling. A message
+  can get there in a few hundred bytes of values: records whose values take no bytes nest
+  up to `table.len()` deep for each byte. 0.10 skips by recursing on the call stack,
+  with no limit on Wasm, where a deep enough message traps; the rewrite never traps here,
+  but the constant is large. Options: no entry for a level that has nothing left, smaller
+  entries, a default `values` chosen with this cost in mind, or a nesting limit on
+  skipping too.
+- **A receiver nests on the call stack.** Reading at the receiver's types recurses, some
+  frames for each level, up to `depth` = 1024 levels. Whether that fits a Wasm canister's
+  stack (often 1 MB) has not been measured. If it does not, a message nested that deep
+  traps, as every deep message does in 0.10, which has no limit on Wasm. Measure the
+  stack used per level on wasm32, then set the default.
+
 ### Lean: `decodeAt`
 
 Lean decodes a message and then coerces its values; Rust does both in one pass. Before
@@ -284,7 +320,9 @@ not yet proved.
 2. Lean's `decodeAt`, and the theorem.
 3. Reading values at the receiver's types. Checked by every `decode` vector in full, and
    every `coerce` vector as encode-then-decode.
-4. Differential fuzzing against Lean, and the `costly` vectors under `Limits`.
+4. Differential fuzzing against Lean, and the `costly` vectors under `Limits`. Then the
+   costs under [Limits](#limits): measure them, test them on adversarial shapes, and
+   set the defaults.
 
 ## Naming
 

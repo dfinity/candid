@@ -44,7 +44,9 @@ impl core::error::Error for DecodeError {}
 /// One reason a message is rejected (`lean/Spec/Binary.md`).
 ///
 /// All are rejections the spec requires, except the resource limits it allows (Section
-/// 9), which [`Rejection::is_resource_limit`] tells apart.
+/// 9), which [`Rejection::is_resource_limit`] tells apart, and two that are bugs in a
+/// receiver rather than in the message: [`Rejection::ReceiverMismatch`] and
+/// [`Rejection::FieldNotExpected`].
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum Rejection {
@@ -83,6 +85,54 @@ pub enum Rejection {
     /// A resource limit: a header takes some tens of times its length in memory once
     /// read, and the sender chooses its length.
     HeaderTooLarge,
+    /// A `bool` that is neither 0 nor 1.
+    NotABool(u8),
+    /// An `opt` tag that is neither 0 nor 1.
+    NotAnOptTag(u8),
+    /// A reference flag that is neither 0 nor 1.
+    NotAReferenceFlag(u8),
+    /// An opaque reference: one carried outside the message, which this decoder does not
+    /// take (`lean/Spec/Binary.md`, Appendix A.1).
+    OpaqueReference,
+    /// A principal, or a reference's, of more than 29 bytes.
+    PrincipalTooLong,
+    /// A variant index past the variant's last alternative.
+    VariantIndexOutOfRange,
+    /// A value of type `empty`, which has none.
+    ValueOfEmpty,
+    /// A value of a record type that contains itself at no cost, which has none: its
+    /// every value would be infinitely long (`lean/Candid/Wire.lean`, "Termination").
+    RecordWithoutValue,
+    /// Bytes after the last value.
+    BytesAfterValues,
+    /// A value that does not have its type at an infinite option, such as `type R = opt
+    /// R`: the coercion is undefined, so the message is rejected wherever it is
+    /// (`lean/Spec/Types.md`, Section 6.1). The rest of the message is read first: an
+    /// error in its bytes, or a limit it runs into, is the answer instead. The position
+    /// is the value's.
+    InfiniteOption,
+    /// More values than [`Limits::values`](crate::Limits::values), counting every value
+    /// in the message, wherever it is.
+    ///
+    /// A resource limit: a value of `null`, `reserved` or a record of them takes no bytes,
+    /// so a few bytes can stand for any number of them.
+    TooManyValues,
+    /// Values nested deeper than [`Limits::depth`](crate::Limits::depth) in what the
+    /// receiver builds.
+    ///
+    /// A resource limit: a receiver nests as the values do, on the stack.
+    TooDeep,
+    /// Not the message's fault: the receiver asked for a value of another shape than its
+    /// own type, the one named, which is a bug in the receiver.
+    ReceiverMismatch {
+        /// The receiver's type for the value.
+        expected: Slot,
+        /// The method it called, such as `nat` or `record`.
+        method: &'static str,
+    },
+    /// Not the message's fault: the receiver asked for a record field its type does not
+    /// have, or not in ascending order of id, which is a bug in the receiver.
+    FieldNotExpected(FieldId),
 }
 
 impl Rejection {
@@ -91,7 +141,10 @@ impl Rejection {
     pub fn is_resource_limit(&self) -> bool {
         matches!(
             self,
-            Rejection::OpcodeOutOfRange | Rejection::HeaderTooLarge
+            Rejection::OpcodeOutOfRange
+                | Rejection::HeaderTooLarge
+                | Rejection::TooManyValues
+                | Rejection::TooDeep
         )
     }
 }
@@ -123,6 +176,32 @@ impl fmt::Display for Rejection {
                 f.write_str("a future type's opcode is below -2^63, past this decoder's limit")
             }
             Rejection::HeaderTooLarge => f.write_str("the header is longer than the limit"),
+            Rejection::NotABool(b) => write!(f, "bool {b}, neither 0 nor 1"),
+            Rejection::NotAnOptTag(b) => write!(f, "option tag {b}, neither 0 nor 1"),
+            Rejection::NotAReferenceFlag(b) => write!(f, "reference flag {b}, neither 0 nor 1"),
+            Rejection::OpaqueReference => f.write_str("an opaque reference"),
+            Rejection::PrincipalTooLong => f.write_str("a principal of more than 29 bytes"),
+            Rejection::VariantIndexOutOfRange => {
+                f.write_str("a variant index past the last alternative")
+            }
+            Rejection::ValueOfEmpty => f.write_str("a value of type empty"),
+            Rejection::RecordWithoutValue => {
+                f.write_str("a record type that contains itself at no cost has no value")
+            }
+            Rejection::BytesAfterValues => f.write_str("bytes after the last value"),
+            Rejection::InfiniteOption => {
+                f.write_str("a value that does not accept null at an infinite option")
+            }
+            Rejection::TooManyValues => f.write_str("more values than the limit"),
+            Rejection::TooDeep => f.write_str("values nested deeper than the limit"),
+            Rejection::ReceiverMismatch { expected, method } => write!(
+                f,
+                "the receiver read a {method} where its type is {expected:?}"
+            ),
+            Rejection::FieldNotExpected(id) => write!(
+                f,
+                "the receiver asked for field {id}, which its type does not have next"
+            ),
         }
     }
 }

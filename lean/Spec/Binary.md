@@ -295,7 +295,9 @@ A principal, and the principal of a service reference, is the byte `01`, then a 
 its bytes. A function reference is the byte `01`, then its principal written as above,
 then its method name as text.
 
-A decoder MUST reject a principal of more than 29 bytes ([TYPES], Section 3.1). It MUST
+A decoder MUST reject a principal of more than 29 bytes ([TYPES], Section 3.1), and
+does so by its length, before reading its bytes: a principal that claims more is
+rejected whatever follows. It MUST
 reject any first byte other than `01`: the byte `00` stands, in [CANDID], for a
 reference carried outside the message, which this version does not have.
 

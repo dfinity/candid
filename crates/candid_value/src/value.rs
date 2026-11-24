@@ -3,8 +3,8 @@
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
-use candid_binary::{Encode, EncodeError, ValueWriter};
-use candid_types::FieldId;
+use candid_binary::{Decode, DecodeError, Encode, EncodeError, ValueReader, ValueWriter};
+use candid_types::{Composite, FieldId, Primitive, Slot};
 use ic_principal::Principal;
 
 use crate::number::{Int, Nat};
@@ -181,6 +181,74 @@ impl Encode for Value {
             Value::Service(p) => writer.service(p.as_slice()),
             Value::Func(p, method) => writer.func(p.as_slice(), method),
         }
+    }
+}
+
+/// Reads the value at the receiver's type, following it: so a decoded value has that
+/// type. At `vec nat8` it is always a [`Value::Blob`].
+impl<'a> Decode<'a> for Value {
+    fn try_decode(reader: ValueReader<'_, 'a>) -> Result<Option<Value>, DecodeError> {
+        let expected = reader.expected();
+        let principal = |id: &[u8]| Principal::from_slice(id);
+        Ok(match (expected.slot(), expected.composite()) {
+            (Slot::Primitive(p), _) => match p {
+                Primitive::Null => reader.null()?.map(|()| Value::Null),
+                Primitive::Reserved => reader.reserved()?.map(|()| Value::Null),
+                Primitive::Empty => reader.empty()?.map(|never| match never {}),
+                Primitive::Bool => reader.bool()?.map(Value::Bool),
+                Primitive::Nat => reader
+                    .nat()?
+                    .map(|n| Value::Nat(Nat::from_le_bytes(&n.to_le_bytes()))),
+                Primitive::Int => reader
+                    .int()?
+                    .map(|i| Value::Int(Int::from_le_bytes(&i.to_le_bytes()))),
+                Primitive::Nat8 => reader.nat8()?.map(Value::Nat8),
+                Primitive::Nat16 => reader.nat16()?.map(Value::Nat16),
+                Primitive::Nat32 => reader.nat32()?.map(Value::Nat32),
+                Primitive::Nat64 => reader.nat64()?.map(Value::Nat64),
+                Primitive::Int8 => reader.int8()?.map(Value::Int8),
+                Primitive::Int16 => reader.int16()?.map(Value::Int16),
+                Primitive::Int32 => reader.int32()?.map(Value::Int32),
+                Primitive::Int64 => reader.int64()?.map(Value::Int64),
+                Primitive::Float32 => reader.float32()?.map(|f| Value::Float32(f.into())),
+                Primitive::Float64 => reader.float64()?.map(|f| Value::Float64(f.into())),
+                Primitive::Text => reader.text()?.map(|s| Value::Text(s.into())),
+                Primitive::Principal => reader
+                    .principal()?
+                    .map(|id| Value::Principal(principal(id))),
+            },
+            (_, Some(Composite::Opt(_))) => reader.opt(Value::try_decode)?.map(|v| match v {
+                Some(v) => Value::Opt(Box::new(v)),
+                None => Value::Null,
+            }),
+            (_, Some(Composite::Vec(Slot::NAT8))) => {
+                reader.blob()?.map(|b| Value::Blob(b.to_vec()))
+            }
+            (_, Some(Composite::Vec(_))) => reader.vec(Value::try_decode)?.map(Value::Vec),
+            (_, Some(Composite::Record(fields))) => reader.record(|r| {
+                let mut values = Vec::with_capacity(fields.len());
+                for &(id, _) in fields {
+                    match r.field(id, Value::try_decode)? {
+                        Some(v) => values.push((id, v)),
+                        None => return Ok(None),
+                    }
+                }
+                // The receiver's fields are in ascending id, so this is a record already.
+                Ok(Some(Value::Record(Record { fields: values })))
+            })?,
+            (_, Some(Composite::Variant(_))) => reader.variant(|id, r| {
+                Ok(Value::try_decode(r)?.map(|v| Value::Variant(id, Box::new(v))))
+            })?,
+            (_, Some(Composite::Func { .. })) => reader
+                .func()?
+                .map(|(id, method)| Value::Func(principal(id), method.into())),
+            (_, Some(Composite::Service(_))) => {
+                reader.service()?.map(|id| Value::Service(principal(id)))
+            }
+            (_, Some(Composite::Future { .. })) => reader.future()?.map(|()| Value::Null),
+            // A reference into the receiver's table resolves.
+            (Slot::Ref(_), None) => reader.null()?.map(|()| Value::Null),
+        })
     }
 }
 
