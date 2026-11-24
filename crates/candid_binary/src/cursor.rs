@@ -73,6 +73,11 @@ pub(crate) struct Cursor<'a> {
     /// Subtype answers for references, by sender's entry and receiver's entry. Only for
     /// one receiver's table at a time: cleared for each argument.
     subtypes: BTreeMap<(usize, usize), bool>,
+    /// Where a value at an infinite option was, once one has been: its coercion is
+    /// undefined (`lean/Spec/Types.md`, Section 6.1), and so is the message's. The message
+    /// is still read to its end first, as `decodeAt` reads it, so that an error in its
+    /// bytes or a limit it runs into is the answer instead.
+    pub(crate) undefined: Option<usize>,
 }
 
 impl<'a> Cursor<'a> {
@@ -84,6 +89,7 @@ impl<'a> Cursor<'a> {
             depth: 0,
             pending: None,
             subtypes: BTreeMap::new(),
+            undefined: None,
         }
     }
 
@@ -219,18 +225,21 @@ impl<'a> Cursor<'a> {
 
     /// `n` bytes, the elements of a `vec nat8`, each counted.
     ///
-    /// The one step the elements one by one would take, and the same rejection: the
-    /// count runs out at the element where it would, unless the bytes run out first.
+    /// The one step the elements one by one would take, and the same rejection at the
+    /// same byte: each element is counted, then read, so the elements before the count or
+    /// the bytes run out are read, and the next one fails at the byte after them.
     pub(crate) fn bytes_counted(&mut self, n: u64) -> Read<&'a [u8]> {
         let room = self.limits.values - self.used;
         let left = self.reader.rest().len() as u64;
-        if n > room && room <= left {
-            self.used = self.limits.values;
-            return self.fail(Rejection::TooManyValues);
+        let whole = n.min(room).min(left);
+        let bytes = self.reader.bytes(whole)?;
+        self.used += whole;
+        if whole == n {
+            return Ok(bytes);
         }
-        let bytes = self.reader.bytes(n)?;
-        self.used += n;
-        Ok(bytes)
+        // The next element: its count runs out, or else its byte does.
+        self.charge()?;
+        self.fail(Rejection::EndOfInput)
     }
 
     /// Whether a reference of the sender's type `t` coerces to the receiver's `u`: whether

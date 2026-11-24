@@ -121,21 +121,34 @@ impl<'a> Decoder<'a> {
         if v.is_none() {
             self.failed = true;
         }
+        if let Some(at) = self.cursor.undefined {
+            // An undefined argument is the message's answer, once the rest of the message
+            // has been read without an error.
+            self.skip_rest()?;
+            return Err(DecodeError::new(at, Rejection::InfiniteOption));
+        }
         Ok(v)
     }
 
-    /// The end of the message: skip the arguments not read, which are checked and
-    /// counted all the same, then check that no bytes follow the last value.
-    pub fn finish(mut self) -> Result<(), DecodeError> {
+    /// Skip the arguments not read, which are checked and counted all the same, then
+    /// check that no bytes follow the last value.
+    fn skip_rest(&mut self) -> Result<(), DecodeError> {
         let table = self.header.table();
         for &slot in &self.header.types()[self.next..] {
             self.cursor.skip(table, Pending { slot, stall: 0 })?;
         }
+        self.next = self.header.types().len();
         if self.cursor.reader.rest().is_empty() {
             Ok(())
         } else {
             self.cursor.fail(Rejection::BytesAfterValues)
         }
+    }
+
+    /// The end of the message: skip the arguments not read, which are checked and
+    /// counted all the same, then check that no bytes follow the last value.
+    pub fn finish(mut self) -> Result<(), DecodeError> {
+        self.skip_rest()
     }
 }
 

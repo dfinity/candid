@@ -107,7 +107,9 @@ pub enum Rejection {
     BytesAfterValues,
     /// A value that does not have its type at an infinite option, such as `type R = opt
     /// R`: the coercion is undefined, so the message is rejected wherever it is
-    /// (`lean/Spec/Types.md`, Section 6.1).
+    /// (`lean/Spec/Types.md`, Section 6.1). The rest of the message is read first: an
+    /// error in its bytes, or a limit it runs into, is the answer instead. The position
+    /// is the value's.
     InfiniteOption,
     /// More values than [`Limits::values`](crate::Limits::values), counting every value
     /// in the message, wherever it is.

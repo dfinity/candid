@@ -166,13 +166,16 @@ after the last value.
 
 **Results.** Three outcomes, as Section 6.1 of Types.md has them: a value is `Ok(Some(_))`, failure
 is `Ok(None)`, and undefined -- reading a value that does not accept `null` at an
-infinite option -- is an `Err`, like a malformed message and a resource limit. A
+infinite option -- is an `Err`, like a malformed message and a resource limit. It is
+the answer only once the rest of the message is read, as `decodeAt` has it: an error in
+the bytes after it, or a limit they run into, comes first. A
 failure an `opt` does not absorb rejects the message too; `Decoder::argument`'s caller
 gets it as `Ok(None)` and the facade turns it into an error naming the argument.
 
 **Fast paths are specialisations.** `vec nat8` read into a `&[u8]` or `Vec<u8>`, and
 text read into a `&str`, take the bytes in one step. They are the general path with
-the loop unrolled, covered by the same vectors (CLAUDE.md, anti-pattern 6).
+the loop unrolled, covered by the same vectors (CLAUDE.md, anti-pattern 6): the same
+values counted, the same depth checked, and the same error at the same byte.
 
 **References.** A `func` or `service` value coerces only if its type is a subtype of the
 expected one. The decoder caches each answer by the pair of table entries, so a vector

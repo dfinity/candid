@@ -450,15 +450,31 @@ impl<'r, 'a> ValueReader<'r, 'a> {
                 return Ok(Some(None));
             }
             let value = Some(Pending { slot: t, stall: 0 });
-            self.part(value, u, inner).map(Some)
+            let v = self.part(value, u, inner)?;
+            Ok(self.recover(v))
         } else {
             // The sender's value has no `null`: it is the value under the option, if it
             // coerces to the receiver's type there -- the same value, read one option
-            // deeper. At an infinite option that question has no answer.
+            // deeper. At an infinite option that question has no answer: the value is
+            // skipped, and is undefined, which no enclosing `opt` recovers from.
             if is_infinite_option(self.expected.table(), u.slot()) {
-                return self.cursor.fail(Rejection::InfiniteOption);
+                self.begin();
+                let at = self.cursor.position();
+                self.cursor.skip(self.sender, p)?;
+                self.cursor.undefined.get_or_insert(at);
+                return Ok(None);
             }
-            self.part(Some(p), u, inner).map(Some)
+            let v = self.part(Some(p), u, inner)?;
+            Ok(self.recover(v))
+        }
+    }
+
+    /// The value under an `opt`, or `null` if it failed -- unless it is undefined, which
+    /// stays a failure: `Outcome.recover` of `lean/Candid/DecodeAt.lean`.
+    fn recover<T>(&self, v: Option<T>) -> Option<Option<T>> {
+        match (v, self.cursor.undefined) {
+            (_, Some(_)) => None,
+            (v, None) => Some(v),
         }
     }
 
@@ -528,6 +544,11 @@ impl<'r, 'a> ValueReader<'r, 'a> {
         self.begin();
         self.cursor.charge()?;
         let n = self.cursor.reader.unsigned()?;
+        // Each element would be read one level deeper.
+        if n > 0 {
+            self.cursor.enter()?;
+            self.cursor.leave();
+        }
         if t == Slot::NAT8 {
             return self.cursor.bytes_counted(n).map(Some);
         }
@@ -855,6 +876,97 @@ mod tests {
         assert_eq!(e.rejection(), &Rejection::TooManyValues);
         limits.values = 3;
         assert!(read(&bytes, &t, r(0), limits, |r| r.blob()).is_ok());
+    }
+
+    #[test]
+    fn a_blob_fails_where_its_elements_would() {
+        let blobs = vec![Composite::Vec(Slot::NAT8)];
+        let bytes = message(blobs.clone(), r(0), |w| w.blob(&[7, 8]));
+        let t = table(blobs);
+        let both = |bytes: &[u8], limits: Limits| {
+            let blob = read(bytes, &t, r(0), limits, |r| r.blob()).map(|b| b.map(<[u8]>::to_vec));
+            let each = read(bytes, &t, r(0), limits, |r| r.vec(|e| e.nat8()));
+            assert_eq!(blob, each);
+            blob.unwrap_err()
+        };
+        // The count runs out at the second byte: the vector and the first are counted.
+        let limits = Limits {
+            values: 2,
+            ..Limits::default()
+        };
+        let e = both(&bytes, limits);
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (bytes.len() - 1, &Rejection::TooManyValues)
+        );
+        // The bytes run out at the second byte.
+        let cut = &bytes[..bytes.len() - 1];
+        let e = both(cut, Limits::default());
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (cut.len(), &Rejection::EndOfInput)
+        );
+        // Both at once: the count, which comes first.
+        let e = both(cut, limits);
+        assert_eq!(e.rejection(), &Rejection::TooManyValues);
+        // Each element would be one level deeper.
+        let flat = Limits {
+            depth: 0,
+            ..Limits::default()
+        };
+        assert_eq!(both(&bytes, flat).rejection(), &Rejection::TooDeep);
+        let empty = message(vec![Composite::Vec(Slot::NAT8)], r(0), |w| w.blob(&[]));
+        let blob = read(&empty, &t, r(0), flat, |r| r.blob());
+        assert_eq!(blob, Ok(Some(&[][..])));
+    }
+
+    /// A `nat`, then `extra`, read at `type R = opt R`.
+    fn at_infinite_option(extra: &[u8], limits: Limits) -> Outcome<Option<()>> {
+        let mut bytes = message(vec![], Slot::NAT, |w| w.nat(&[5]));
+        bytes.extend_from_slice(extra);
+        let receiver = table(vec![Composite::Opt(r(0))]);
+        read(&bytes, &receiver, r(0), limits, |r| r.opt(|_| Ok(Some(()))))
+    }
+
+    #[test]
+    fn an_infinite_option_is_the_answer_last() {
+        let e = at_infinite_option(&[], Limits::default()).unwrap_err();
+        assert_eq!(e.rejection(), &Rejection::InfiniteOption);
+        // An error in the message's bytes is the answer instead.
+        let e = at_infinite_option(&[0], Limits::default()).unwrap_err();
+        assert_eq!(e.rejection(), &Rejection::BytesAfterValues);
+        let none = Limits {
+            values: 0,
+            ..Limits::default()
+        };
+        let e = at_infinite_option(&[], none).unwrap_err();
+        assert_eq!(e.rejection(), &Rejection::TooManyValues);
+    }
+
+    #[test]
+    fn an_infinite_option_is_not_null_under_an_opt() {
+        // `opt vec R`, with `type R = opt R`, and `vec {5}` sent: the element is undefined,
+        // and so the vector is, which the outer `opt` does not make `null`.
+        let nats = vec![Composite::Vec(Slot::NAT)];
+        let bytes = message(nats, r(0), |w| {
+            let mut v = w.vec(1)?;
+            v.element()?.nat(&[5])?;
+            v.finish()
+        });
+        let receiver = table(vec![
+            Composite::Opt(r(0)),
+            Composite::Opt(r(2)),
+            Composite::Vec(r(0)),
+        ]);
+        let mut seen = None;
+        let got = read(&bytes, &receiver, r(1), Limits::default(), |r| {
+            let v = r.opt(|v| v.vec(|e| e.opt(|_| Ok(Some(())))));
+            seen = Some(v.clone());
+            v
+        });
+        assert_eq!(got.unwrap_err().rejection(), &Rejection::InfiniteOption);
+        // What the receiver saw: a failure, not `null`.
+        assert_eq!(seen, Some(Ok(None)));
     }
 
     #[test]
