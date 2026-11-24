@@ -27,7 +27,7 @@ use core::convert::Infallible;
 
 use candid_types::{Composite, FieldId, Primitive, Root, Slot, TypeTable};
 
-use crate::cursor::{Cursor, Pending, Scalar, accepts_null, is_infinite_option};
+use crate::cursor::{Cursor, Pending, Scalar, accepts_null};
 use crate::error::{DecodeError, Rejection};
 use crate::leb128;
 use crate::reader::Read;
@@ -457,7 +457,7 @@ impl<'r, 'a> ValueReader<'r, 'a> {
             // coerces to the receiver's type there -- the same value, read one option
             // deeper. At an infinite option that question has no answer: the value is
             // skipped, and is undefined, which no enclosing `opt` recovers from.
-            if is_infinite_option(self.expected.table(), u.slot()) {
+            if self.cursor.is_infinite_option(u) {
                 self.begin();
                 let at = self.cursor.position();
                 self.cursor.skip(self.sender, p)?;
@@ -607,7 +607,6 @@ impl<'r, 'a> ValueReader<'r, 'a> {
         self.begin();
         self.cursor.charge()?;
         self.cursor.record_stall(self.sender, p.stall)?;
-        self.cursor.enter()?;
         let mut record = RecordReader {
             start: self.cursor.position(),
             cursor: &mut *self.cursor,
@@ -621,9 +620,13 @@ impl<'r, 'a> ValueReader<'r, 'a> {
             failed: false,
         };
         let value = fields(&mut record)?;
+        // A record the receiver gives up on has failed, as one whose field fails has:
+        // nothing more of it is read at the receiver's types.
+        if value.is_none() {
+            record.failed = true;
+        }
         record.finish()?;
         let failed = record.failed;
-        self.cursor.leave();
         Ok(if failed { None } else { value })
     }
 }
@@ -967,6 +970,86 @@ mod tests {
         assert_eq!(got.unwrap_err().rejection(), &Rejection::InfiniteOption);
         // What the receiver saw: a failure, not `null`.
         assert_eq!(seen, Some(Ok(None)));
+    }
+
+    #[test]
+    fn a_record_is_one_level_deep() {
+        let entries = vec![Composite::Record(vec![(FieldId::new(0), Slot::NAT8)])];
+        let bytes = message(entries.clone(), r(0), |w| {
+            let mut rec = w.record()?;
+            rec.field(FieldId::new(0))?.nat8(1)?;
+            rec.finish()
+        });
+        let t = table(entries);
+        let at = |depth| {
+            let limits = Limits {
+                depth,
+                ..Limits::default()
+            };
+            read(&bytes, &t, r(0), limits, |r| {
+                r.record(|rec| rec.field(FieldId::new(0), |r| r.nat8()))
+            })
+        };
+        assert_eq!(at(1), Ok(Some(1)));
+        assert_eq!(at(0).unwrap_err().rejection(), &Rejection::TooDeep);
+        // An empty record has no level below it.
+        let empty = vec![Composite::Record(vec![])];
+        let bytes = message(empty.clone(), r(0), |w| w.record()?.finish());
+        let flat = Limits {
+            depth: 0,
+            ..Limits::default()
+        };
+        let got = read(&bytes, &table(empty), r(0), flat, |r| {
+            r.record(|_| Ok(Some(())))
+        });
+        assert_eq!(got, Ok(Some(())));
+    }
+
+    #[test]
+    fn a_record_the_receiver_gives_up_on_has_failed() {
+        // `opt record {0 : nat; 1 : R}`, with `type R = opt R`, and `{0 = 1; 1 = 5}` sent.
+        // The receiver gives up before field 1, which is not read at `R`: the record
+        // fails, and the `opt` is `null`.
+        let sent = vec![Composite::Record(vec![
+            (FieldId::new(0), Slot::NAT),
+            (FieldId::new(1), Slot::NAT),
+        ])];
+        let bytes = message(sent, r(0), |w| {
+            let mut rec = w.record()?;
+            rec.field(FieldId::new(0))?.nat(&[1])?;
+            rec.field(FieldId::new(1))?.nat(&[5])?;
+            rec.finish()
+        });
+        let receiver = table(vec![
+            Composite::Opt(r(0)),
+            Composite::Record(vec![(FieldId::new(0), Slot::NAT), (FieldId::new(1), r(0))]),
+            Composite::Opt(r(1)),
+        ]);
+        let got = read(&bytes, &receiver, r(2), Limits::default(), |r| {
+            r.opt(|v| v.record(|_| Ok(None::<()>)))
+        });
+        assert_eq!(got, Ok(Some(None)));
+    }
+
+    #[test]
+    fn a_principal_is_read_before_its_length_is_checked() {
+        // Flag 1 and a length of 30, then nothing: the bytes run out first.
+        let bytes = [b'D', b'I', b'D', b'L', 0x00, 0x01, 0x68, 0x01, 0x1e];
+        let none = TypeTable::default();
+        let e = read(&bytes, &none, Slot::PRINCIPAL, Limits::default(), |r| {
+            r.principal()
+        });
+        assert_eq!((e.unwrap_err().rejection()), &Rejection::EndOfInput);
+        let mut long = bytes.to_vec();
+        long.extend_from_slice(&[0; 30]);
+        let e = read(&long, &none, Slot::PRINCIPAL, Limits::default(), |r| {
+            r.principal()
+        });
+        let e = e.unwrap_err();
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (8, &Rejection::PrincipalTooLong)
+        );
     }
 
     #[test]

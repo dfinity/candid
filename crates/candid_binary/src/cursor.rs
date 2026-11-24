@@ -73,6 +73,9 @@ pub(crate) struct Cursor<'a> {
     /// Subtype answers for references, by sender's entry and receiver's entry. Only for
     /// one receiver's table at a time: cleared for each argument.
     subtypes: BTreeMap<(usize, usize), bool>,
+    /// Which of the receiver's entries are infinite options, as they are asked about. For
+    /// the same receiver's table as `subtypes`.
+    infinite_options: BTreeMap<usize, bool>,
     /// Where a value at an infinite option was, once one has been: its coercion is
     /// undefined (`lean/Spec/Types.md`, Section 6.1), and so is the message's. The message
     /// is still read to its end first, as `decodeAt` reads it, so that an error in its
@@ -89,6 +92,7 @@ impl<'a> Cursor<'a> {
             depth: 0,
             pending: None,
             subtypes: BTreeMap::new(),
+            infinite_options: BTreeMap::new(),
             undefined: None,
         }
     }
@@ -101,9 +105,22 @@ impl<'a> Cursor<'a> {
         self.reader.fail(self.position(), rejection)
     }
 
-    /// A new receiver's table: forget the subtype answers about the last one.
+    /// A new receiver's table: forget the answers about the last one.
     pub(crate) fn new_receiver(&mut self) {
         self.subtypes.clear();
+        self.infinite_options.clear();
+    }
+
+    /// Whether the receiver's type `u` is an infinite option. Asked once for each entry,
+    /// so that reading through a chain of options does not walk the rest of it at each.
+    pub(crate) fn is_infinite_option(&mut self, u: Root<'_>) -> bool {
+        let Slot::Ref(r) = u.slot() else {
+            return false;
+        };
+        *self
+            .infinite_options
+            .entry(r.index())
+            .or_insert_with(|| is_infinite_option(u.table(), u.slot()))
     }
 
     /// Count one value against the limit, as `charge` in `lean/Candid/Wire.lean`.
@@ -165,12 +182,14 @@ impl<'a> Cursor<'a> {
     /// `M(id(v*))`: flag 1, then at most 29 bytes.
     pub(crate) fn id(&mut self) -> Read<&'a [u8]> {
         self.reference_flag()?;
+        // Its bytes are read before their length is checked, as `readId` in
+        // `lean/Candid/Wire.lean` does: bytes that are not there are the error first.
         let at = self.position();
-        let n = self.reader.unsigned()?;
-        if n > MAX_PRINCIPAL_LENGTH {
+        let bytes = self.reader.blob()?;
+        if bytes.len() as u64 > MAX_PRINCIPAL_LENGTH {
             return self.reader.fail(at, Rejection::PrincipalTooLong);
         }
-        self.reader.bytes(n)
+        Ok(bytes)
     }
 
     /// A function reference: flag 1, the service's principal, the method's name.
