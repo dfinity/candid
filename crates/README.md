@@ -324,16 +324,17 @@ not yet proved.
    costs under [Limits](#limits): measure them, test them on adversarial shapes, and
    set the defaults.
 
-   As built so far: `lake exe oracle differential` (`lean/Oracle/Differential.lean`)
-   writes random messages, often damaged, with `decodeAt`'s exact answer at a receiver's
-   types and a limit on the values; `tests/differential.rs` in `conformance_tests`
-   requires the same values, failure, undefined coercion, or rejection at the same byte
-   -- and so the same count, since a limit of one value fewer than a message has must
-   stop at the same value. The rejections in Lean are `candid_binary`'s kinds, and the
-   header's errors are at the start of the item they reject in both. A small corpus is
-   committed; CI runs 40,000 more, from a fixed seed on a pull request and a new one on
-   every push. The `costly`
-   vectors are among them: every case at the oracle's limit is one. Left: receivers
+   As built so far: the Lean model writes random messages, often damaged, with
+   `decodeAt`'s exact answer at a receiver's types and a limit on the values
+   (`conformance/differential/`, the optional "Exact answers" of
+   `conformance/README.md`). `tests/differential.rs` in `conformance_tests` requires
+   the same values, failure, undefined coercion, or rejection at the same byte -- and so
+   the same count, since a limit of one value fewer than a message has must stop at the
+   same value. `candid_binary`'s `Rejection` follows the model's kinds, and reports a
+   header error at the start of the item it rejects, as the model does. The committed
+   cases run with `cargo test`; the `differential` workflow runs 40,000 more, from a
+   fixed seed on a pull request and a new one on every push. The `costly` vectors are
+   among them: every case at the oracle's limit is one. Left: receivers
    that read in other ways than `Value` does -- other fields, giving up, a vector byte by
    byte where `Value` takes a blob -- which must not change the bytes read, the errors
    or the count; and the costs.

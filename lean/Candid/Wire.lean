@@ -32,7 +32,7 @@ every byte string is accepted or rejected, with one answer.
   table may only contain composite types"); a composite opcode in a slot position, since
   `I` is a primitive or an index; record and variant fields not in strictly ascending id
   order, and methods not in strictly ascending name order -- the spec "assume[s]" both
-  orders and `candid` 0.10 enforces them, so a repeated label is rejected here rather
+  orders, and here they are required, so a repeated label is rejected here rather
   than by well-formedness; a field id that does not fit in 32 bits; an unknown function
   annotation; a method name that is not UTF-8; and then everything
   `RawTypeTable.check` rejects.
@@ -51,17 +51,15 @@ it sits.
 (Appendix A.1):
 
 - **Non-shortest LEB128 is accepted.** The spec says "LEB128" and nothing about
-  redundant continuation bytes; `candid` 0.10 accepts them. Encoding writes the shortest
-  form.
+  redundant continuation bytes. Encoding writes the shortest form.
 - **Opaque references are rejected.** `M(ref(r) : principal) = i8(0)` stands for a
   reference carried outside the byte stream, in `R`, and the spec leaves unspecified how
-  the two are bundled. A `Value` has no reference table to point into, and `candid` 0.10
-  rejects them too ("Opaque reference not supported").
+  the two are bundled. A `Value` has no reference table to point into.
 - **A future value's references are ignored.** A future type is an opcode below `-24`,
   a length and that many bytes; a future value is two lengths, `m` and `n`, then `m`
   bytes, "accompanied by `n` corresponding references in `R`" (`spec/Candid.md`,
   "Deserialisation of future types"). The model has no `R`, as above, and a future
-  value is skipped, so `n` is read and ignored, as `candid` 0.10 does.
+  value is skipped, so `n` is read and ignored.
 
 **Future types.** A decoder that meets one keeps it in the table, as
 `Composite.future`, and decodes its values to `null`: all it can know of one, and the
@@ -267,10 +265,9 @@ A reader is given the input and a position, and returns what it read and where i
 stopped -- with that position's relation to the start, which is what the termination
 argument for values needs. -/
 
-/-- Why a message was rejected: the kinds of `candid_binary`'s `Rejection` that this
-model can give, by the same names, so that the two can be compared case by case. A
-published vector says only *that* a message is rejected; the kind and the position are
-what `candid_binary` is checked against (`Oracle/Differential.lean`). -/
+/-- Why a message was rejected. A conformance vector says only *that* a message is
+rejected; the kind and the position are for an implementation that reports why and
+where as the model does (`Oracle/Differential.lean`). -/
 inductive Rejection where
   | endOfInput
   | missingMagicNumber
@@ -300,8 +297,10 @@ inductive Rejection where
   | unreachable
   deriving Repr, BEq, DecidableEq
 
-/-- Why a message was rejected, and where: the byte at which the offending item starts.
-The message is for people. -/
+/-- Why a message was rejected, and where: the byte at which the item it rejects starts --
+the byte, the type reference, the list of fields or methods, the table entry. A table
+that is not well formed is rejected at its first malformed entry, an argument type that
+does not resolve at that type. The message is for people. -/
 structure DecodeError where
   position : Nat
   rejection : Rejection

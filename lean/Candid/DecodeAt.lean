@@ -1,13 +1,14 @@
 /-
-Decoding at the receiver's types, in one pass: what `candid_binary` will do.
+Decoding at the receiver's types, in one pass.
 
 `deserialize` (`Wire.lean`) is the spec's order: decode the whole message at the
 sender's types, then coerce the values to the receiver's. A decoder that works that way
-builds every value twice, and a typed one would need a coercion of its own beside the
-decoder -- a second implementation of one behaviour. So the Rust decoder does both at
-once: it reads each value at a pair of types, the sender's and the receiver's, and
-builds only the receiver's value. `decodeAt` is that pass, written the way the Rust is,
-so that the Rust can be a transcription of it; and `decodeAt_eq` says it is the spec.
+builds every value twice, and one that builds typed values would need a coercion of its
+own beside the decoder -- a second implementation of one behaviour. A decoder can do
+both at once instead: read each value at a pair of types, the sender's and the
+receiver's, and build only the receiver's value. `decodeAt` is that pass, written as
+such a decoder would be, so that one can be a transcription of it; and `decodeAt_eq`
+says it is the spec.
 
 **Reading at a pair of types.** `decodeValueAt` follows `coerce`, case for case, but where
 `coerce` is handed a value it reads one. A scalar is read at the sender's type and

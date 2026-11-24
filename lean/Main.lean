@@ -5,7 +5,7 @@ The reference executable.
     oracle write <dir>      write the vector files into <dir>
     oracle check <file>...  check vector files against the model
     oracle differential <file> [<seed> <count>]
-                            write differential cases for `candid_binary` to <file>
+                            write random messages with exact answers to <file>
 
 With no arguments it is the model's test suite, and what `lake test` runs. Every
 vector is checked against the model, and also written and read back, so the JSON
@@ -17,9 +17,8 @@ it changed. `check` reads files as any other runner would, and is what makes tho
 files something the model can be held to rather than only something it emits.
 
 `differential` writes random messages with the model's exact answers
-(`Oracle/Differential.lean`). With no seed it writes the committed corpus,
-`crates/conformance_tests/tests/differential.json`, which CI writes again and compares
-the same way.
+(`Oracle/Differential.lean`). With no seed it writes the committed cases,
+`conformance/differential/cases.json`, which CI writes again and compares the same way.
 
 Every mode exits nonzero on any failure.
 -/

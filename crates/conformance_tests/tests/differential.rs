@@ -1,7 +1,7 @@
 //! `candid_binary` held to the Lean model, case by case.
 //!
-//! `differential.json` is written by `lake exe oracle differential`
-//! (`lean/Oracle/Differential.lean`): random messages, often damaged, each read at
+//! `conformance/differential/cases.json` is written by `lake exe oracle differential`
+//! (`conformance/README.md`, "Exact answers"): random messages, often damaged, each read at
 //! receiver's types that are the sender's, a variation of them, or unrelated, within a
 //! limit on the values decoded -- with the answer `decodeAt` gives. A conformance vector
 //! asks only whether a message is rejected. `candid_binary` transcribes `decodeAt`, so it
@@ -9,8 +9,8 @@
 //! coercion, and for a rejected message the same rejection at the same byte, a count that
 //! runs out at the same value included.
 //!
-//! The committed corpus is small. For a longer run, write more cases with another seed
-//! and point `CANDID_DIFFERENTIAL` at them:
+//! The committed cases are few. For a longer run, write more with another seed and point
+//! `CANDID_DIFFERENTIAL` at them, as the `differential` workflow does:
 //!
 //! ```text
 //! lake exe oracle differential /tmp/cases.json 1 40000   # in lean/
@@ -43,7 +43,9 @@ enum Answer {
 fn differential() {
     let path = match std::env::var_os("CANDID_DIFFERENTIAL") {
         Some(path) => PathBuf::from(path),
-        None => Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/differential.json"),
+        None => {
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/differential/cases.json")
+        }
     };
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let cases: Vec<Value> = serde_json::from_str(&text).expect("the corpus is JSON");

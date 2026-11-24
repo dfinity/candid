@@ -1,12 +1,12 @@
 /-
-Differential cases: random messages, each with the model's exact answer, for
-`candid_binary` to be held to (`crates/conformance_tests/tests/differential.rs`).
+Differential cases: random messages, each with the model's exact answer
+(`conformance/README.md`, "Exact answers").
 
-A conformance vector says only *that* a message is rejected, which is all another
-implementation owes. `candid_binary` owes more: it is a transcription of `decodeAt`
-(`Candid/DecodeAt.lean`), so it must give the same answer for every message -- the same
-values, the same failure or undefined coercion, and for a message it rejects, the same
-`Rejection` at the same byte. These cases are where that is checked.
+A conformance vector says only *that* a message is rejected, which is all conformance
+asks. An implementation that reports why and where, as `decodeAt`
+(`Candid/DecodeAt.lean`) does, can be held to more: the same values, the same failure or
+undefined coercion, and for a message it rejects, the same `Rejection` at the same byte.
+These cases are where that is asked.
 
 **A case** is a message, the receiver's types, a limit on the values decoded, and the
 answer `decodeAt` gives. The messages are built to reach what hand-written vectors miss,
@@ -23,9 +23,9 @@ which is combinations:
   that the count is checked to the value.
 
 **Deterministic.** The cases come from a seed. `lake exe oracle differential <file>`
-writes the committed corpus from a fixed seed, and CI writes it again and fails on a
-difference, as it does for the vectors. A different seed and count give more cases: CI
-runs 40,000 messages more, and so can a longer run by hand.
+writes the committed cases, `conformance/differential/cases.json`, from a fixed seed,
+and CI writes them again and fails on a difference, as it does for the vectors. Another
+seed and count give more cases, for a longer run.
 
 The self-test also checks `decodeAt_eq` on every case: these are the messages that
 reach the most combinations, so they are where the one pass is most likely to differ
@@ -387,7 +387,7 @@ def cases (seed count : Nat) : List Case :=
     return all.toList
   (go.run (mkStdGen seed)).1
 
-/-- The committed corpus: `crates/conformance_tests/tests/differential.json`. -/
+/-- The committed cases: `conformance/differential/cases.json`. -/
 def corpusSeed : Nat := 803
 def corpusCount : Nat := 2000
 

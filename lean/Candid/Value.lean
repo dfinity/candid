@@ -17,8 +17,8 @@ at all. They belong to the textual syntax, which this model does not have yet.
 
 **`null` is one value.** The spec writes `null` for the value of type `null`, for an
 absent option, and for "the" value of `reserved` (coercion "is arbitrarily using `null`
-as the value of `reserved`"). Rust's `IDLValue` has three constructors for these. The
-model follows the spec, and a runner translates by type.
+as the value of `reserved`"). The model follows the spec; an implementation with a
+constructor for each translates by type.
 
 **Records are canonical.** A record value lists its fields in strictly ascending id
 order, which is the order the wire format sends them in. `hasType` requires it and

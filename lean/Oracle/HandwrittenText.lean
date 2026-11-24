@@ -4,8 +4,8 @@ following `lean/Spec/TextValues.md`. As in `Oracle/Handwritten.lean`, each expec
 is written down from the document rather than computed by the model, and the ids say
 what each case shows. Section numbers in the ids are the document's.
 
-Where `candid` 0.10 answers differently, the document's Appendix B.2 says why; the
-runner lists those vectors as known divergences.
+Where an implementation is known to answer differently, the document's Appendix B.2
+says so.
 -/
 
 import Oracle.Handwritten

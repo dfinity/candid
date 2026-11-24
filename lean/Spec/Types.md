@@ -583,11 +583,14 @@ it differs from `candid` 0.10, the Rust implementation.
 - **One rule for options.** [CANDID] states four rules for `t <: opt t'`, two with
   negative premises. Together they relate every type to every option, which is rule 6
   of [Section 5.1](#51-the-relation). Without negative premises the relation is the
-  greatest fixed point of monotone rules, and so is well defined. candid 0.10 agrees.
+  greatest fixed point of monotone rules, and so is well defined. candid 0.10 agrees: it
+  accepts every type as a subtype of an option, with a warning where the four rules
+  would not.
 - **Coercion as cases.** [CANDID] states coercion as rules with negative premises, such
   as "no coercion exists". Here it is a definition by cases with three outcomes, which
   says the same where [CANDID] is defined, and is undefined only at an infinite option,
-  as [CANDID] says since #778.
+  as [CANDID] says since #778. candid 0.10 agrees since 0.10.20, and
+  `test/construct.test.did` asserts it.
 - **The order of a record's fields** ([Section 6.5](#65-records-and-variants)), of a
   vector's elements and of arguments decides between failure and undefinedness. [CANDID]
   does not say. This is candid 0.10's order.

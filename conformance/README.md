@@ -8,12 +8,14 @@ a vector too. See [REWRITE.md](../REWRITE.md) for why this exists.
 
 ```
 vectors/                 the suite: JSON, one vector per line
+differential/            exact answers, for an implementation that reports why and where
 runners/candid-0.10/     checks the suite against rust/candid
 tools/test-did/          translates test/*.test.did for the model
 ```
 
 ```
 cd lean && lake exe oracle write ../conformance/vectors        # regenerate
+cd lean && lake exe oracle differential ../conformance/differential/cases.json
 cd lean && lake exe oracle check ../conformance/vectors/*.json # check against the model
 cargo run --release --manifest-path conformance/runners/candid-0.10/Cargo.toml \
     -- conformance/vectors/*.json                              # check against 0.10
@@ -191,6 +193,46 @@ The hex is the principal's bytes, lowercase.
 
 The reference reader rejects unknown keys, kinds and names rather than skip them: once
 the suite is published, the version number is how the format changes.
+
+### Exact answers (optional)
+
+A vector asks only whether a message is rejected, which is all conformance asks. An
+implementation that also reports *why* and *where* -- as the model does -- can be held
+to exactly that, on random messages: `differential/cases.json`, a JSON array, one case
+per line.
+
+```
+{"message": "<hex>", "receiver": <types>, "limit": <n>, "answer": <answer>}
+```
+
+The message is read at the receiver's types, decoding at most `limit` values, counted
+as the `costly` vectors count them (`lean/Candid/Wire.lean`, "Costly messages"). The
+answer is one of:
+
+```
+{"values": [<value>, ...]}                  the values, at the receiver's types
+"failure"                                   an argument does not coerce
+"undefined"                                 an argument is at an infinite option
+{"rejection": "<kind>", "position": <n>}    rejected, at byte n
+```
+
+A rejection is at the first byte of the item it rejects: the byte, the type reference,
+the list of fields or methods, the table entry -- the first malformed one, for a table
+that is not well formed -- the argument type that does not resolve, the value. The
+kinds are the constructors of `Rejection` in `lean/Candid/Wire.lean`:
+`endOfInput`, `missingMagicNumber`, `notATypeReference`, `notAType`,
+`primitiveInTable`, `fieldIdTooLarge`, `fieldsOutOfOrder`, `methodsOutOfOrder`,
+`unknownAnnotation`, `textNotUtf8`, `malformedTable`, `unresolvedArgument`, `notABool`,
+`notAnOptTag`, `notAReferenceFlag`, `opaqueReference`, `principalTooLong`,
+`variantIndexOutOfRange`, `valueOfEmpty`, `recordWithoutValue`, `bytesAfterValues`, and
+`tooManyValues` for a message past the limit. An implementation's own resource limits
+are its own: one may stop a message the model reads on, but not where the model has
+already rejected it.
+
+The cases are random -- types, values, damage to the bytes, variations of the receiver's
+types, limits set to the value -- and come from a seed (`lean/Oracle/Differential.lean`).
+The committed file is from a fixed one, and CI writes it again and fails on a
+difference. `lake exe oracle differential <file> <seed> <count>` writes more.
 
 ### Runners
 

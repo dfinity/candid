@@ -1,7 +1,8 @@
 name: Crates
 
 # Builds and tests the v1 crates under `crates/`, their own workspace. Their tests read
-# `conformance/vectors/`, so a change there triggers this too.
+# `conformance/vectors/` and `conformance/differential/`, so a change there triggers this
+# too.
 #
 # Rides the `rewrite` branch under the carve-out in REWRITE.md, Section 5: it gates
 # only the new directories, so it cannot affect any check that runs on `master` today.
@@ -14,11 +15,13 @@ on:
     paths:
       - 'crates/**'
       - 'conformance/vectors/**'
+      - 'conformance/differential/**'
       - '.github/workflows/crates.yml'
   pull_request:
     paths:
       - 'crates/**'
       - 'conformance/vectors/**'
+      - 'conformance/differential/**'
       - '.github/workflows/crates.yml'
 
 # Not a required status check. If it becomes one, the workflow-level `paths:` filter
