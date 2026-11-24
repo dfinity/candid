@@ -659,8 +659,12 @@ pub struct RecordReader<'r, 'a> {
 }
 
 impl<'a> RecordReader<'_, 'a> {
-    /// The next of the receiver's fields not asked for yet, if any is left.
+    /// The next of the receiver's fields not asked for yet, if any is left. `None` once a
+    /// field has failed, which decides the record: there is nothing more to ask for.
     pub fn next_field(&self) -> Option<FieldId> {
+        if self.failed {
+            return None;
+        }
         self.expected.get(self.next_expected).map(|&(id, _)| id)
     }
 
@@ -1052,6 +1056,30 @@ mod tests {
         });
         let e = e.unwrap_err();
         assert_eq!((e.position(), e.rejection()), (9, &Rejection::EndOfInput));
+    }
+
+    #[test]
+    fn no_field_is_next_once_one_has_failed() {
+        // A receiver that asks for fields while there are any, and ignores failures: the
+        // first failure ends the record, rather than offering the same field forever.
+        let (bytes, entries) = three_nats();
+        let mut receiver = entries.clone();
+        receiver[0] = Composite::Record(vec![
+            (FieldId::new(1), Slot::TEXT),
+            (FieldId::new(2), Slot::NAT),
+            (FieldId::new(3), Slot::NAT),
+        ]);
+        let mut asked = 0;
+        let got = read(&bytes, &table(receiver), r(0), Limits::default(), |r| {
+            r.record(|rec| {
+                while let Some(id) = rec.next_field() {
+                    asked += 1;
+                    let _ = rec.field(id, Discard::try_decode)?;
+                }
+                Ok(Some(()))
+            })
+        });
+        assert_eq!((got, asked), (Ok(None), 1));
     }
 
     #[test]
