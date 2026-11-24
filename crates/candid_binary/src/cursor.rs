@@ -111,16 +111,37 @@ impl<'a> Cursor<'a> {
         self.infinite_options.clear();
     }
 
-    /// Whether the receiver's type `u` is an infinite option. Asked once for each entry,
-    /// so that reading through a chain of options does not walk the rest of it at each.
+    /// Whether the receiver's type `u` is an infinite option, such as `type R = opt R`: a
+    /// chain of options that does not end (`optLayers` in `lean/Candid/Coerce.lean`).
+    ///
+    /// Every entry on the chain has the same answer -- it ends, or it does not -- so the
+    /// walk records it for all of them, and stops at one already known: each entry of the
+    /// receiver's table is walked over once, however many layers are read through.
     pub(crate) fn is_infinite_option(&mut self, u: Root<'_>) -> bool {
-        let Slot::Ref(r) = u.slot() else {
-            return false;
+        let table = u.table();
+        let mut chain = Vec::new();
+        let mut slot = u.slot();
+        let infinite = loop {
+            let Slot::Ref(r) = slot else {
+                break false;
+            };
+            if let Some(&known) = self.infinite_options.get(&r.index()) {
+                break known;
+            }
+            // A chain longer than the table has come back to an entry on it.
+            if chain.len() > table.len() {
+                break true;
+            }
+            chain.push(r.index());
+            match table.lookup(r) {
+                Some(Composite::Opt(inner)) => slot = *inner,
+                _ => break false,
+            }
         };
-        *self
-            .infinite_options
-            .entry(r.index())
-            .or_insert_with(|| is_infinite_option(u.table(), u.slot()))
+        for entry in chain {
+            self.infinite_options.insert(entry, infinite);
+        }
+        infinite
     }
 
     /// Count one value against the limit, as `charge` in `lean/Candid/Wire.lean`.
@@ -384,18 +405,43 @@ pub(crate) fn accepts_null(table: &TypeTable, slot: Slot) -> bool {
     }
 }
 
-/// Whether `slot` is an infinite option, such as `type R = opt R`: a chain of options that
-/// does not end (`optLayers` in `lean/Candid/Coerce.lean`). A chain that ends visits each
-/// entry at most once.
-pub(crate) fn is_infinite_option(table: &TypeTable, mut slot: Slot) -> bool {
-    for _ in 0..=table.len() {
-        match slot {
-            Slot::Ref(r) => match table.lookup(r) {
-                Some(Composite::Opt(inner)) => slot = *inner,
-                _ => return false,
-            },
-            Slot::Primitive(_) => return false,
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use candid_types::{RawTypeTable, TypeRef};
+
+    fn r(i: usize) -> Slot {
+        Slot::Ref(TypeRef::new(i))
     }
-    true
+
+    /// The answer for each entry of `entries`, asked from the first, and how many entries
+    /// that one question walked over.
+    fn chain(entries: Vec<Composite>) -> (bool, Vec<(usize, bool)>) {
+        let table = RawTypeTable::from(entries).check().unwrap();
+        let mut cursor = Cursor::new(Reader::new(&[]), Limits::default());
+        let answer = cursor.is_infinite_option(table.root(r(0)).unwrap());
+        (answer, cursor.infinite_options.into_iter().collect())
+    }
+
+    #[test]
+    fn a_chain_is_walked_once() {
+        // `opt opt opt nat`: it ends, and every entry on the way is known to.
+        let ends = chain(vec![
+            Composite::Opt(r(1)),
+            Composite::Opt(r(2)),
+            Composite::Opt(Slot::NAT),
+        ]);
+        assert_eq!(ends, (false, vec![(0, false), (1, false), (2, false)]));
+        // `opt` of a loop of two: it does not end.
+        let loops = chain(vec![
+            Composite::Opt(r(1)),
+            Composite::Opt(r(2)),
+            Composite::Opt(r(1)),
+        ]);
+        assert_eq!(loops, (true, vec![(0, true), (1, true), (2, true)]));
+        // Not an option at all.
+        let not = chain(vec![Composite::Vec(Slot::NAT)]);
+        assert_eq!(not, (false, vec![(0, false)]));
+    }
 }
