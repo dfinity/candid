@@ -8,11 +8,13 @@ on:
     paths:
       - 'lean/**'
       - 'conformance/vectors/**'
+      - 'crates/**'
       - '.github/workflows/lean.yml'
   pull_request:
     paths:
       - 'lean/**'
       - 'conformance/vectors/**'
+      - 'crates/**'
       - '.github/workflows/lean.yml'
 
 # Not a required status check. If it becomes one, the workflow-level `paths:` filter
@@ -57,3 +59,41 @@ jobs:
       - name: conformance vectors agree with the model
         working-directory: lean
         run: lake exe oracle check ../conformance/vectors/*.json
+
+      # The differential corpus `candid_binary` is tested against is the model's output
+      # too, from a fixed seed.
+      - name: differential corpus is up to date
+        working-directory: lean
+        run: |
+          lake exe oracle differential ../crates/conformance_tests/tests/differential.json
+          git diff --exit-code -- ../crates/conformance_tests/tests/differential.json
+
+  # `candid_binary` held to the model on far more messages than are committed, from a
+  # seed that changes with every run: fuzzing, with the model as the judge. A failure
+  # is a disagreement between the two, and the log names the seed that reproduces it
+  # (`crates/conformance_tests/tests/differential.rs`).
+  differential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+        with:
+          lake-package-directory: lean
+          build: true
+          test: false
+          use-mathlib-cache: false
+      # See `crates.yml`: the image's bundled stable would make the cache key vary.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      - uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          cache-workspaces: crates
+      - name: write cases
+        working-directory: lean
+        run: |
+          echo "seed $GITHUB_RUN_ID"
+          lake exe oracle differential "$RUNNER_TEMP/cases.json" "$GITHUB_RUN_ID" 40000
+      - name: candid_binary agrees with the model
+        run: cargo test --locked --manifest-path crates/Cargo.toml -p conformance_tests --test differential
+        env:
+          CANDID_DIFFERENTIAL: ${{ runner.temp }}/cases.json

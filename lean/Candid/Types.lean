@@ -196,6 +196,11 @@ def RawTypeTable.methodsDenoteFuncs (t : RawTypeTable) : Composite → Bool
 def RawTypeTable.wellFormed (t : RawTypeTable) : Bool :=
   t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c
 
+/-- The first entry that is not well formed, if any: where a decoder says a table is
+malformed. -/
+def RawTypeTable.firstMalformed? (t : RawTypeTable) : Option Nat :=
+  t.entries.toList.findIdx? fun c => !(c.wellFormed t.size && t.methodsDenoteFuncs c)
+
 /-! ## The validated table
 
 Well-formedness is a prerequisite of everything downstream -- subtyping, decoding,

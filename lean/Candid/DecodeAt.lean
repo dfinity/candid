@@ -131,7 +131,7 @@ def decodeValueAt (A B : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤
             | .error e => .error e
             | .ok ((o, used), ⟨q, hq⟩) =>
               .ok ((o.recover .opt .null, used), ⟨q, by omega, hq.2⟩)
-          | .ok (b, _) => .error ⟨pos, s!"option tag {b}, neither 0 nor 1"⟩
+          | .ok (b, _) => .error ⟨pos, .notAnOptTag, s!"option tag {b}, neither 0 nor 1"⟩
       -- `null` or `reserved`: `null` at any option.
       | none => decodeThen A bs pos hpos stall limit used t fun _ => .ok (some .null)
     else
@@ -166,13 +166,15 @@ def decodeCoreAt (A B : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ 
           match decodeFieldsAt A B bs pos hpos (stall + 1) limit used fs (sortFields gs) with
           | .error e => .error e
           | .ok ((o, used), q) => .ok ((o.map .record, used), q)
-        else .error ⟨pos, "a record type that contains itself at no cost has no value"⟩
+        else .error ⟨pos, .recordWithoutValue,
+          "a record type that contains itself at no cost has no value"⟩
     | some (.variant fs), some (.variant gs) => match charge pos limit used with
       | .error e => .error e
       | .ok used => match readLeb bs pos with
         | .error e => .error e
         | .ok (i, ⟨p, hp⟩) => match fs[i]? with
-          | none => .error ⟨pos, s!"variant index {i} past the last of {fs.length} alternatives"⟩
+          | none => .error ⟨pos, .variantIndexOutOfRange,
+              s!"variant index {i} past the last of {fs.length} alternatives"⟩
           | some (id, t') => match fieldAt gs id with
             | some u' => match decodeValueAt A B bs p hp.2 0 limit used t' u' with
               | .error e => .error e

@@ -22,13 +22,16 @@ lake build                                    # build the libraries and the exec
 lake exe oracle                               # check the model against every vector
 lake exe oracle write ../conformance/vectors  # regenerate the committed vectors
 lake exe oracle check <file>...               # check vector files against the model
+lake exe oracle differential <file> [<seed> <count>]  # random messages with exact answers
 ```
 
 Two libraries. `Candid` is the model and imports nothing outside Lean's core.
 `Oracle` is about the model: the vector format and its JSON
 ([Oracle/Vector.lean](Oracle/Vector.lean)), the hand-written vectors
-([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), and the generator
-([Oracle/Generate.lean](Oracle/Generate.lean)). It uses `Lean.Data.Json`, which is why
+([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), the generator
+([Oracle/Generate.lean](Oracle/Generate.lean)), and the differential cases
+`candid_binary` is held to ([Oracle/Differential.lean](Oracle/Differential.lean)). It
+uses `Lean.Data.Json`, which is why
 it is separate. The format itself is specified in
 [conformance/README.md](../conformance/README.md#format-version-0).
 
@@ -446,6 +449,26 @@ fourth: 0.10 does not check the method name of a function reference that coercio
 drops, where the document checks every value.
 The other new vectors, on redundant LEB128, a two-byte future opcode and a type
 without values at `reserved`, agree.
+
+## What step 4 of the rewrite established
+
+**The model as a differential oracle** (item 3 of the ordering rule).
+[Oracle/Differential.lean](Oracle/Differential.lean) writes random messages -- random
+types and values, encoded, often damaged, read at the sender's types, a variation of
+them or unrelated ones, within a limit set to the value -- each with the exact answer
+`decodeAt` gives. `candid_binary` must give the same answer to every one
+(`crates/conformance_tests/tests/differential.rs`): the same values, failure or
+undefined coercion, and for a rejected message the same rejection at the same byte. A
+small corpus from a fixed seed is committed and checked to be up to date; CI also runs
+40,000 messages from a seed that changes with every run. The self-test checks
+`decodeAt_eq` on the corpus too.
+
+**Rejections have kinds.** `DecodeError` carries a `Rejection`, named after
+`candid_binary`'s, beside its message; a published vector still says only that a message
+is rejected. To make "the same byte" one answer, a header error is now at the start of
+the item it rejects -- the byte, the slot, the field list, the method list, the entry --
+as `candid_binary` already had it: a malformed table at its first malformed entry
+(`RawTypeTable.firstMalformed?`), an argument type that does not resolve at that type.
 
 ## Constraints
 

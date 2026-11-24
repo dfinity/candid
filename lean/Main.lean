@@ -4,6 +4,8 @@ The reference executable.
     oracle                  check the model against every vector it has
     oracle write <dir>      write the vector files into <dir>
     oracle check <file>...  check vector files against the model
+    oracle differential <file> [<seed> <count>]
+                            write differential cases for `candid_binary` to <file>
 
 With no arguments it is the model's test suite, and what `lake test` runs. Every
 vector is checked against the model, and also written and read back, so the JSON
@@ -13,6 +15,11 @@ reader and writer are tested on everything they will ever be asked to handle.
 the committed files differ, so a change to the model shows up as a diff of the answers
 it changed. `check` reads files as any other runner would, and is what makes those
 files something the model can be held to rather than only something it emits.
+
+`differential` writes random messages with the model's exact answers
+(`Oracle/Differential.lean`). With no seed it writes the committed corpus,
+`crates/conformance_tests/tests/differential.json`, which CI writes again and compares
+the same way.
 
 Every mode exits nonzero on any failure.
 -/
@@ -78,6 +85,11 @@ def selfTest : IO UInt32 := do
     if let some d := v.assertion.decodeAtDisagreement then
       IO.println s!"FAIL  {v.id}: {d}"
       problems := problems + 1
+  let differential := Differential.cases Differential.corpusSeed Differential.corpusCount
+  for p in Differential.violations differential do
+    IO.println s!"FAIL  {p}"
+    problems := problems + 1
+  IO.println s!"ok    decodeAt_eq on {differential.length} differential cases"
   for p in TestDid.violations ++ TestDid.parserViolations do
     IO.println s!"FAIL  test/{p}"
     problems := problems + 1
@@ -130,11 +142,23 @@ def checkFiles (paths : List String) : IO UInt32 := do
     IO.eprintln s!"{failed} of {total} vectors failed"
     return 1
 
+def writeDifferential (path : System.FilePath) (seed count : Nat) : IO UInt32 := do
+  let cs := Differential.cases seed count
+  IO.FS.writeFile path (Differential.render cs)
+  IO.println s!"wrote {cs.length} differential cases to {path}"
+  return 0
+
 def usage : String :=
-  "usage: oracle | oracle write <dir> | oracle check <file>..."
+  "usage: oracle | oracle write <dir> | oracle check <file>... | " ++
+    "oracle differential <file> [<seed> <count>]"
 
 def main : List String → IO UInt32
   | [] => selfTest
   | ["write", dir] => writeFiles dir
   | "check" :: paths@(_ :: _) => checkFiles paths
+  | ["differential", path] =>
+    writeDifferential path Differential.corpusSeed Differential.corpusCount
+  | ["differential", path, seed, count] => match seed.toNat?, count.toNat? with
+    | some s, some n => writeDifferential path s n
+    | _, _ => do IO.eprintln usage; return 2
   | _ => do IO.eprintln usage; return 2

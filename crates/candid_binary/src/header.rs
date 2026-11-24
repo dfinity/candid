@@ -255,13 +255,14 @@ fn entry(r: &mut Reader<'_>) -> Read<Composite> {
             }
         }
         opcode::SERVICE => {
+            let start = r.position();
             let methods = list(r, |r| {
                 let name = String::from(r.text()?);
                 Ok((name, slot(r)?))
             })?;
             // `str`'s order is that of the UTF-8 bytes, which is the spec's.
             if !methods.windows(2).all(|w| w[0].0 < w[1].0) {
-                return r.fail(at, Rejection::MethodsOutOfOrder);
+                return r.fail(start, Rejection::MethodsOutOfOrder);
             }
             Composite::Service(methods)
         }
