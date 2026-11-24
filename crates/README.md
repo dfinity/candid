@@ -269,6 +269,24 @@ is `candid_syntax`'s, not this crate's.
 Both are resource limits (Binary.md, Section 9), with defaults generous for any real
 message.
 
+Two costs are bounded but not yet measured or tuned; step 4 settles them:
+
+- **Skipping uses heap, per level of nesting.** Skipping is a loop over a stack of what
+  is left to read, kept on the heap: one entry, about 40 bytes, for each level still
+  open. Each level is a counted value, so the stack is bounded by `values` -- but at the
+  default of 2²², that is up to about 160 MB, more with the `Vec`'s doubling. A message
+  can get there in a few hundred bytes of values: records whose values take no bytes nest
+  up to `table.len()` deep for each byte. 0.10 skips by recursing on the call stack,
+  with no limit on Wasm, where a deep enough message traps; the rewrite never traps here,
+  but the constant is large. Options: no entry for a level that has nothing left, smaller
+  entries, a default `values` chosen with this cost in mind, or a nesting limit on
+  skipping too.
+- **A receiver nests on the call stack.** Reading at the receiver's types recurses, some
+  frames for each level, up to `depth` = 1024 levels. Whether that fits a Wasm canister's
+  stack (often 1 MB) has not been measured. If it does not, a message nested that deep
+  traps, as every deep message does in 0.10, which has no limit on Wasm. Measure the
+  stack used per level on wasm32, then set the default.
+
 ### Lean: `decodeAt`
 
 Lean decodes a message and then coerces its values; Rust does both in one pass. Before
@@ -302,7 +320,9 @@ not yet proved.
 2. Lean's `decodeAt`, and the theorem.
 3. Reading values at the receiver's types. Checked by every `decode` vector in full, and
    every `coerce` vector as encode-then-decode.
-4. Differential fuzzing against Lean, and the `costly` vectors under `Limits`.
+4. Differential fuzzing against Lean, and the `costly` vectors under `Limits`. Then the
+   costs under [Limits](#limits): measure them, test them on adversarial shapes, and
+   set the defaults.
 
 ## Naming
 
