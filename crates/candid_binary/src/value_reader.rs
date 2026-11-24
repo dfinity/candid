@@ -1032,17 +1032,11 @@ mod tests {
     }
 
     #[test]
-    fn a_principal_is_read_before_its_length_is_checked() {
-        // Flag 1 and a length of 30, then nothing: the bytes run out first.
+    fn a_principal_is_rejected_by_its_length() {
+        // Flag 1 and a length of 30, then nothing: too long, whatever follows.
         let bytes = [b'D', b'I', b'D', b'L', 0x00, 0x01, 0x68, 0x01, 0x1e];
         let none = TypeTable::default();
         let e = read(&bytes, &none, Slot::PRINCIPAL, Limits::default(), |r| {
-            r.principal()
-        });
-        assert_eq!((e.unwrap_err().rejection()), &Rejection::EndOfInput);
-        let mut long = bytes.to_vec();
-        long.extend_from_slice(&[0; 30]);
-        let e = read(&long, &none, Slot::PRINCIPAL, Limits::default(), |r| {
             r.principal()
         });
         let e = e.unwrap_err();
@@ -1050,6 +1044,14 @@ mod tests {
             (e.position(), e.rejection()),
             (8, &Rejection::PrincipalTooLong)
         );
+        // A length of 29 is read on, and runs out of bytes.
+        let mut short = bytes;
+        short[8] = 0x1d;
+        let e = read(&short, &none, Slot::PRINCIPAL, Limits::default(), |r| {
+            r.principal()
+        });
+        let e = e.unwrap_err();
+        assert_eq!((e.position(), e.rejection()), (9, &Rejection::EndOfInput));
     }
 
     #[test]

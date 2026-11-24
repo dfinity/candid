@@ -349,16 +349,21 @@ def readText (bs : ByteArray) (pos : Nat) : Read1 bs pos String :=
     | some s => .ok (s, p)
     | none => .error ⟨pos, "text is not UTF-8"⟩
 
-/-- `M(id(v*))`: flag `1`, then the bytes, at most `maxPrincipalLength` of them. Flag `0`
+/-- `M(id(v*))`: flag `1`, then a length of at most `maxPrincipalLength`, then that many
+bytes. A longer length is rejected before its bytes are read. Flag `0`
 is an opaque reference, which this model does not have; see the header. -/
 def readId (bs : ByteArray) (pos : Nat) : Read1 bs pos PrincipalBytes :=
   match readByte bs pos with
   | .error e => .error e
-  | .ok (1, ⟨p, hp⟩) => match readBlob bs p with
+  | .ok (1, ⟨p, hp⟩) => match readLeb bs p with
     | .error e => .error e
-    | .ok (b, ⟨q, hq⟩) =>
-      if b.size ≤ maxPrincipalLength then .ok (b.toList, ⟨q, by omega, hq.2⟩)
-      else .error ⟨p, s!"a principal of {b.size} bytes, more than {maxPrincipalLength}"⟩
+    | .ok (len, ⟨q, hq⟩) =>
+      -- The length is checked before the bytes are read: a principal that is too long is
+      -- rejected whatever follows its length.
+      if len ≤ maxPrincipalLength then match readBytes bs q len with
+        | .error e => .error e
+        | .ok (b, ⟨r, hr⟩) => .ok (b.toList, ⟨r, by omega, hr.2⟩)
+      else .error ⟨p, s!"a principal of {len} bytes, more than {maxPrincipalLength}"⟩
   | .ok (0, _) => .error ⟨pos, "opaque reference"⟩
   | .ok (f, _) => .error ⟨pos, s!"reference flag {f}, neither 0 nor 1"⟩
 

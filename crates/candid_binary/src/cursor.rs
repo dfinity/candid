@@ -182,14 +182,14 @@ impl<'a> Cursor<'a> {
     /// `M(id(v*))`: flag 1, then at most 29 bytes.
     pub(crate) fn id(&mut self) -> Read<&'a [u8]> {
         self.reference_flag()?;
-        // Its bytes are read before their length is checked, as `readId` in
-        // `lean/Candid/Wire.lean` does: bytes that are not there are the error first.
+        // Its length is checked before its bytes are read, as `readId` in
+        // `lean/Candid/Wire.lean` does: too long is too long, whatever follows.
         let at = self.position();
-        let bytes = self.reader.blob()?;
-        if bytes.len() as u64 > MAX_PRINCIPAL_LENGTH {
+        let n = self.reader.unsigned()?;
+        if n > MAX_PRINCIPAL_LENGTH {
             return self.reader.fail(at, Rejection::PrincipalTooLong);
         }
-        Ok(bytes)
+        self.reader.bytes(n)
     }
 
     /// A function reference: flag 1, the service's principal, the method's name.
