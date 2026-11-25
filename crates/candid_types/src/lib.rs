@@ -29,5 +29,5 @@ mod table;
 pub use composite::{Annotation, Composite};
 pub use hash::{FieldId, hash_field_name};
 pub use slot::{ParsePrimitiveError, Primitive, Slot, TypeRef};
-pub use subtype::is_subtype;
+pub use subtype::{is_subtype, is_subtype_within};
 pub use table::{Malformation, MalformedTable, RawTypeTable, Root, TypeTable};

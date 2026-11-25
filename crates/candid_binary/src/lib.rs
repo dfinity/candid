@@ -21,7 +21,10 @@
 //! Every byte of a message comes from an untrusted sender. Nothing here allocates in
 //! advance for a count the message gives, or panics on any input. Nothing nests as deep
 //! as the sender chooses: a receiver recurses, and skipping a value is a loop over a stack
-//! on the heap, and both stop at [`Limits::depth`], a value skipped or read.
+//! on the heap, and both stop at [`Limits::depth`], a value skipped or read. What costs
+//! no bytes is counted instead: the message's values ([`Limits::values`]), the values
+//! the receiver is handed ([`Limits::received`]), and the steps of checking references'
+//! types ([`Limits::subtype_steps`]).
 //!
 //! No global state, no serde. `no_std`.
 

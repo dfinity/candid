@@ -258,16 +258,20 @@ is `candid_syntax`'s, not this crate's.
 
 ### Limits
 
-`Limits` grows two fields:
+`Limits` grows four fields:
 
 - `values`: the most values a message may stand for, counting every value wherever it
   is -- skipped, inside another, past the expected arguments. That is Lean's `limit`,
   counted the same way, so that a message one rejects for its count the other does too.
   It is what stops a `vec null` of length 10⁹.
 - `depth`: the deepest a value may nest, read or skipped.
+- `received`: the most values the receiver may be handed, whether the message has them
+  or not.
+- `subtype_steps`: the most steps the subtype checks of a message's references may take.
 
-Both are resource limits (Binary.md, Section 9), with defaults generous for any real
-message. What they bound, as measured for step 4:
+All are resource limits (Binary.md, Section 9), with defaults generous for any real
+message. Only `values` is the model's; the others Lean does not have, and the
+differential test turns them off. What they bound, as measured:
 
 - **A receiver nests on the call stack.** Reading at the receiver's types recurses: for
   `candid_value` on wasm32, about 450 bytes of stack a level, whatever the shape. A Rust
@@ -283,6 +287,23 @@ message. What they bound, as measured for step 4:
   So a skipped value counts against `depth` too, on from the level it is skipped at: the
   stack holds two entries a level at most, and the same message stops at 0.3 MB, most of
   it its header.
+
+- **Coercion gives the receiver values the message does not have.** A field or
+  argument the sender lacks is `null`, and a value read as an option gets one around it,
+  so a value of the message stands for as many as the receiver's type is wide or deep,
+  and `values`, which counts the message's, bounds none of them. 100,000 empty records
+  read as records of 1,000 `opt nat`s are 14 bytes: `candid_value` built 6.4 GB in 26 s.
+  `received` counts every value handed to the receiver: the same message stops at its
+  default of 2²², at 269 MB. 0.10 has the same gap, and built 8.2 GB, unless its
+  optional `decoding_quota` is set.
+- **References are checked by subtyping, which the sender's types can make long.** A
+  check takes a step for each pair of slots, up to the product of the two tables' sizes,
+  and each of their parts, a method's name by its bytes, and every distinct pair of
+  entries is checked in each argument. 2,500 `func` types sharing a cycle of
+  5,000 variants, in a 77 KB message, took 1.8 s, the checks true or false. 0.10 keeps the
+  pairs it has proven for the message, which makes the true ones fast, and takes 19 s on
+  the false ones. `subtype_steps` stops the message at its default of 2²⁰ steps, in
+  under 0.03 s.
 
 ### Lean: `decodeAt`
 

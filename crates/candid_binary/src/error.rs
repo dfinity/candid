@@ -127,6 +127,18 @@ pub enum Rejection {
     /// A resource limit: a receiver nests as the values do, on the stack, and skipping
     /// keeps an entry on the heap for each level.
     TooDeep,
+    /// More values handed to the receiver than [`Limits::received`](crate::Limits::received),
+    /// the ones coercion adds included.
+    ///
+    /// A resource limit: a value the message lacks, or an `opt` around one it has, takes
+    /// no bytes.
+    TooManyReceived,
+    /// More steps checking the types of references than
+    /// [`Limits::subtype_steps`](crate::Limits::subtype_steps).
+    ///
+    /// A resource limit: a header can hold types whose check takes as many steps as the
+    /// product of the two tables' sizes.
+    TooManySubtypeSteps,
     /// Not the message's fault: the receiver asked for a value of another shape than its
     /// own type, the one named, which is a bug in the receiver.
     ReceiverMismatch {
@@ -150,6 +162,8 @@ impl Rejection {
                 | Rejection::HeaderTooLarge
                 | Rejection::TooManyValues
                 | Rejection::TooDeep
+                | Rejection::TooManyReceived
+                | Rejection::TooManySubtypeSteps
         )
     }
 }
@@ -199,6 +213,12 @@ impl fmt::Display for Rejection {
             }
             Rejection::TooManyValues => f.write_str("more values than the limit"),
             Rejection::TooDeep => f.write_str("values nested deeper than the limit"),
+            Rejection::TooManyReceived => {
+                f.write_str("more values handed to the receiver than the limit")
+            }
+            Rejection::TooManySubtypeSteps => {
+                f.write_str("checking the types of references takes more steps than the limit")
+            }
             Rejection::ReceiverMismatch { expected, method } => write!(
                 f,
                 "the receiver read a {method} where its type is {expected:?}"
