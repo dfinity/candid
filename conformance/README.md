@@ -227,7 +227,8 @@ kinds are the constructors of `Rejection` in `lean/Candid/Wire.lean`:
 `variantIndexOutOfRange`, `valueOfEmpty`, `recordWithoutValue`, `bytesAfterValues`, and
 `tooManyValues` for a message past the limit. An implementation's own resource limits
 are its own: one may stop a message the model reads on, but not where the model has
-already rejected it.
+already rejected it. A `malformedTable` counts as found once the whole table is read,
+though its position is the bad entry's.
 
 The cases are random -- types, values, damage to the bytes, variations of the receiver's
 types, limits set to the value -- and come from a seed (`lean/Oracle/Differential.lean`).

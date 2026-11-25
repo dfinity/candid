@@ -101,10 +101,15 @@ fn check(case: &Value) -> Result<Verdict, String> {
     let got = match decode(&bytes, &receiver, limits) {
         Ok(got) => got,
         // A future type's opcode past an `i64`: a resource limit of this decoder alone,
-        // allowed wherever the model has not already rejected the message.
+        // allowed wherever the model has not already rejected the message. A malformed
+        // table is not found until the whole table is read, so it may point before the
+        // opcode and still come after it.
         Err(e) if *e.rejection() == Rejection::OpcodeOutOfRange => {
             return match want {
-                Answer::Rejected { position, .. } if position <= e.position() => Err(format!(
+                Answer::Rejected {
+                    rejection,
+                    position,
+                } if position <= e.position() && rejection != "malformedTable" => Err(format!(
                     "{}: declined at {} for an opcode, the model rejects it at {position}",
                     to_hex(&bytes),
                     e.position()
@@ -208,4 +213,16 @@ fn read_answer(a: &Value) -> Result<Answer, String> {
         }
         _ => Err(format!("not an answer: {a}")),
     }
+}
+
+#[test]
+fn an_opcode_limit_may_come_before_a_malformed_table() {
+    // A `vec` of an entry that is not there, then a future type's opcode below -2^63.
+    let case = serde_json::json!({
+        "message": "4449444c026d02808080808080808080807e0000",
+        "receiver": { "roots": [], "table": [] },
+        "limit": 10000,
+        "answer": { "rejection": "malformedTable", "position": 5 },
+    });
+    assert!(matches!(check(&case), Ok(Verdict::Declined)));
 }
