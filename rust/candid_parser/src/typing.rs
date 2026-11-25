@@ -19,9 +19,11 @@ pub struct Env<'a> {
 pub fn ast_to_type(env: &TypeEnv, ast: &IDLType) -> Result<Type> {
     let env = Env {
         te: &mut env.clone(),
-        pre: false,
+        pre: true,
     };
-    check_type(&env, ast)
+    let t = check_type(&env, ast)?;
+    validate(env.te, [&t])?;
+    Ok(t)
 }
 
 fn check_prim(prim: &PrimType) -> Type {
@@ -121,17 +123,50 @@ fn check_fields(env: &Env, fs: &[TypeField]) -> Result<Vec<Field>> {
 fn check_meths(env: &Env, ms: &[Binding]) -> Result<Vec<(String, Type)>> {
     // binding duplication is checked in the parser
     let mut res = Vec::new();
+    let mut funcs = BTreeSet::new();
     for meth in ms.iter() {
         let t = check_type(env, &meth.typ)?;
-        if !env.pre && env.te.as_func(&t).is_err() {
-            return Err(Error::msg(format!(
-                "method {} is a non-function type",
-                meth.id
-            )));
+        if !env.pre && !is_func(env.te, &mut funcs, &t).unwrap_or(false) {
+            return Err(non_function(&meth.id));
         }
         res.push((meth.id.to_owned(), t));
     }
     Ok(res)
+}
+
+fn non_function(method: &str) -> Error {
+    Error::msg(format!("method {method} is a non-function type"))
+}
+
+/// Whether `t` resolves to a function type.
+///
+/// `funcs` holds the names already found to resolve to one, so that many
+/// methods typed by the same long chain of aliases walk it once, not once
+/// each. A walk longer than there are names has met a cycle.
+fn is_func<'a>(env: &'a TypeEnv, funcs: &mut BTreeSet<&'a str>, t: &Type) -> Result<bool> {
+    let mut id = match t.as_ref() {
+        TypeInner::Var(id) => id.as_str(),
+        TypeInner::Func(_) => return Ok(true),
+        _ => return Ok(false),
+    };
+    let mut path = Vec::new();
+    while !funcs.contains(id) {
+        if path.len() > env.0.len() {
+            return Ok(false);
+        }
+        let (name, ty) = env
+            .0
+            .get_key_value(id)
+            .ok_or_else(|| env.find_type(id).unwrap_err())?;
+        path.push(name.as_str());
+        match ty.as_ref() {
+            TypeInner::Var(next) => id = next.as_str(),
+            TypeInner::Func(_) => break,
+            _ => return Ok(false),
+        }
+    }
+    funcs.extend(path);
+    Ok(true)
 }
 
 fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
@@ -147,99 +182,90 @@ fn check_defs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     Ok(())
 }
 
+/// Reject a chain of aliases that leads back to itself with no type
+/// constructor in between (`type a = b; type b = a`).
+///
+/// Each name is walked once: a chain that reaches a name already known to be
+/// acyclic stops there. Restarting from every name would be quadratic on long
+/// alias chains, and the walk is a loop, not a recursion, so its stack use
+/// does not grow with the chain either.
 fn check_cycle(env: &TypeEnv) -> Result<()> {
-    fn has_cycle<'a>(seen: &mut BTreeSet<&'a str>, env: &'a TypeEnv, t: &'a Type) -> Result<bool> {
+    let mut acyclic: BTreeSet<&str> = BTreeSet::new();
+    for (id, ty) in env.0.iter() {
+        let mut path: BTreeSet<&str> = BTreeSet::new();
+        path.insert(id.as_str());
+        let mut t = ty;
+        while let TypeInner::Var(next) = t.as_ref() {
+            if acyclic.contains(next.as_str()) {
+                break;
+            }
+            if !path.insert(next.as_str()) {
+                return Err(Error::msg(format!("{id} has cyclic type definition")));
+            }
+            t = env.find_type(next)?;
+        }
+        acyclic.extend(path);
+    }
+    Ok(())
+}
+
+/// Check that every type reachable from `roots` is well formed (so far: every
+/// method of a service has a function type).
+///
+/// It visits each named type once and uses an explicit worklist rather than
+/// recursion, so a long chain of aliases cannot overflow the stack. A service
+/// method typed by a name is queued as that name, so many methods sharing one
+/// signature queue it once, and `is_func` walks each alias chain once.
+fn validate<'a>(env: &'a TypeEnv, roots: impl IntoIterator<Item = &'a Type>) -> Result<()> {
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    let mut funcs: BTreeSet<&str> = BTreeSet::new();
+    let mut todo: Vec<&Type> = roots.into_iter().collect();
+    while let Some(t) = todo.pop() {
         match t.as_ref() {
+            TypeInner::Null
+            | TypeInner::Bool
+            | TypeInner::Nat
+            | TypeInner::Int
+            | TypeInner::Nat8
+            | TypeInner::Nat16
+            | TypeInner::Nat32
+            | TypeInner::Nat64
+            | TypeInner::Int8
+            | TypeInner::Int16
+            | TypeInner::Int32
+            | TypeInner::Int64
+            | TypeInner::Float32
+            | TypeInner::Float64
+            | TypeInner::Text
+            | TypeInner::Reserved
+            | TypeInner::Empty
+            | TypeInner::Unknown
+            | TypeInner::Principal
+            | TypeInner::Future
+            | TypeInner::Knot(_) => (),
             TypeInner::Var(id) => {
-                if seen.insert(id) {
-                    let ty = env.find_type(id)?;
-                    has_cycle(seen, env, ty)
-                } else {
-                    Ok(true)
+                if seen.insert(id.as_str()) {
+                    todo.push(env.find_type(id)?);
                 }
             }
-            _ => Ok(false),
-        }
-    }
-    for (id, ty) in env.0.iter() {
-        let mut seen = BTreeSet::new();
-        if has_cycle(&mut seen, env, ty)? {
-            return Err(Error::msg(format!("{id} has cyclic type definition")));
-        }
-    }
-    Ok(())
-}
-
-fn validate_func(env: &TypeEnv, seen: &mut BTreeMap<String, bool>, func: &Function) -> Result<()> {
-    for arg in func.args.iter() {
-        validate_type(env, seen, arg)?;
-    }
-    for ret in func.rets.iter() {
-        validate_type(env, seen, ret)?;
-    }
-    Ok(())
-}
-
-fn validate_type(env: &TypeEnv, seen: &mut BTreeMap<String, bool>, t: &Type) -> Result<()> {
-    match t.as_ref() {
-        TypeInner::Null
-        | TypeInner::Bool
-        | TypeInner::Nat
-        | TypeInner::Int
-        | TypeInner::Nat8
-        | TypeInner::Nat16
-        | TypeInner::Nat32
-        | TypeInner::Nat64
-        | TypeInner::Int8
-        | TypeInner::Int16
-        | TypeInner::Int32
-        | TypeInner::Int64
-        | TypeInner::Float32
-        | TypeInner::Float64
-        | TypeInner::Text
-        | TypeInner::Reserved
-        | TypeInner::Empty
-        | TypeInner::Unknown
-        | TypeInner::Principal
-        | TypeInner::Future
-        | TypeInner::Knot(_) => Ok(()),
-        TypeInner::Var(id) => match seen.get(id) {
-            Some(true) | Some(false) => Ok(()),
-            None => {
-                seen.insert(id.clone(), false);
-                let res = validate_type(env, seen, env.find_type(id)?);
-                seen.insert(id.clone(), true);
-                res
+            TypeInner::Opt(ty) | TypeInner::Vec(ty) => todo.push(ty),
+            TypeInner::Record(fields) | TypeInner::Variant(fields) => {
+                todo.extend(fields.iter().map(|f| &f.ty));
             }
-        },
-        TypeInner::Opt(ty) | TypeInner::Vec(ty) => validate_type(env, seen, ty),
-        TypeInner::Record(fields) | TypeInner::Variant(fields) => {
-            for field in fields.iter() {
-                validate_type(env, seen, &field.ty)?;
+            TypeInner::Func(func) => todo.extend(func.args.iter().chain(func.rets.iter())),
+            TypeInner::Service(methods) => {
+                for (name, ty) in methods.iter() {
+                    if !is_func(env, &mut funcs, ty)? {
+                        return Err(non_function(name));
+                    }
+                    todo.push(ty);
+                }
             }
-            Ok(())
-        }
-        TypeInner::Func(func) => validate_func(env, seen, func),
-        TypeInner::Service(methods) => {
-            for (_, ty) in methods.iter() {
-                let func = env.as_func(ty)?;
-                validate_func(env, seen, func)?;
+            TypeInner::Class(args, ty) => {
+                todo.extend(args.iter());
+                todo.push(ty);
             }
-            Ok(())
         }
-        TypeInner::Class(args, ty) => {
-            for arg in args.iter() {
-                validate_type(env, seen, arg)?;
-            }
-            validate_type(env, seen, ty)
-        }
-    }
-}
-
-fn validate_decs(env: &TypeEnv) -> Result<()> {
-    let mut seen = BTreeMap::new();
-    for ty in env.0.values() {
-        validate_type(env, &mut seen, ty)?;
     }
     Ok(())
 }
@@ -257,11 +283,24 @@ fn check_decs(env: &mut Env, decs: &[Dec]) -> Result<()> {
     check_defs(env, decs)?;
     check_cycle(env.te)?;
     env.pre = false;
-    validate_decs(env.te)?;
+    validate(env.te, env.te.0.values())?;
     Ok(())
 }
 
-fn check_actor(env: &Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> {
+/// Check the main actor. Its types are built without checking methods one by
+/// one, and then validated together, like the definitions.
+fn check_actor(env: &mut Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> {
+    env.pre = true;
+    let res = check_actor_(env, actor);
+    env.pre = false;
+    let res = res?;
+    if let Some(t) = &res {
+        validate(env.te, [t])?;
+    }
+    Ok(res)
+}
+
+fn check_actor_(env: &Env, actor: &Option<IDLActorType>) -> Result<Option<Type>> {
     match actor.as_ref().map(|a| &a.typ) {
         None => Ok(None),
         Some(IDLType::ClassT(ts, t)) => {
@@ -328,7 +367,7 @@ fn load_imports(
 pub fn check_prog(te: &mut TypeEnv, prog: &IDLProg) -> Result<Option<Type>> {
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
-    check_actor(&env, &prog.actor)
+    check_actor(&mut env, &prog.actor)
 }
 /// Type check init args extracted from canister metadata candid:args.
 /// Need to provide `main_env`, because init args may refer to variables from the main did file.
@@ -340,10 +379,12 @@ pub fn check_init_args(
     let mut env = Env { te, pre: false };
     check_decs(&mut env, &prog.decs)?;
     env.te.merge(main_env)?;
+    env.pre = true;
     let mut args = Vec::new();
     for arg in prog.args.iter() {
         args.push(check_type(&env, &arg.typ)?);
     }
+    validate(env.te, &args)?;
     Ok(args)
 }
 
@@ -380,7 +421,7 @@ fn check_file_(file: &Path, is_pretty: bool) -> Result<(TypeEnv, Option<Type>, I
         pre: false,
     };
     check_decs(&mut env, &merged_prog.decs())?;
-    let res = check_actor(&env, &merged_prog.resolve_actor()?)?;
+    let res = check_actor(&mut env, &merged_prog.resolve_actor()?)?;
     Ok((te, res, merged_prog))
 }
 
