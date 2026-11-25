@@ -116,7 +116,7 @@ impl<'a> Decoder<'a> {
         });
         self.cursor.new_receiver();
         let table = self.header.table();
-        let v = read(ValueReader::new(&mut self.cursor, table, value, expected))?;
+        let v = read(ValueReader::new(&mut self.cursor, table, value, expected)?)?;
         self.cursor.settle(table)?;
         if v.is_none() {
             self.failed = true;
@@ -194,6 +194,22 @@ pub struct Limits {
     /// stack a Rust canister has by default. Skipping keeps an entry of tens of bytes on
     /// the heap for each level open.
     pub depth: usize,
+    /// The most values the receiver may be handed: each argument, field, element,
+    /// alternative and `opt`'s content it is given to read, whether the message has it or
+    /// not. Counted apart from [`Limits::values`], which counts the message's.
+    ///
+    /// Coercion gives a receiver values the message does not have: `null` for a field
+    /// or argument the sender lacks, and an `opt` around a value that is not one. So a
+    /// few bytes can stand for a receiver's whole type, many times over: 100,000 empty
+    /// records, read as records of 1,000 optional fields, are 14 bytes and 10⁸ values.
+    /// This is what bounds what a receiver builds. The default is 2^22.
+    pub received: u64,
+    /// The most steps the subtype checks of a message's references may take, together
+    /// (`candid_types::is_subtype_within`). A `func` or `service` reference coerces only
+    /// if its type is a subtype of the receiver's, and the sender's types are as large as
+    /// the header lets them be. A pair of entries is checked once in each argument: the
+    /// answers are kept for one receiver's table at a time. The default is 2^20.
+    pub subtype_steps: u64,
 }
 
 impl Default for Limits {
@@ -202,6 +218,8 @@ impl Default for Limits {
             header_bytes: 64 * 1024,
             values: 1 << 22,
             depth: 1024,
+            received: 1 << 22,
+            subtype_steps: 1 << 20,
         }
     }
 }

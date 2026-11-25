@@ -11,7 +11,7 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use candid_types::{Composite, FieldId, Primitive, Root, Slot, TypeTable, is_subtype};
+use candid_types::{Composite, FieldId, Primitive, Root, Slot, TypeTable, is_subtype_within};
 
 use crate::decoder::Limits;
 use crate::error::Rejection;
@@ -67,6 +67,10 @@ pub(crate) struct Cursor<'a> {
     limits: Limits,
     /// Values counted so far.
     used: u64,
+    /// Values handed to the receiver so far.
+    received: u64,
+    /// Steps the subtype checks of references have taken so far.
+    subtype_steps: u64,
     /// How deep the receiver is: the level of the value it is reading, an argument's
     /// being 0.
     depth: usize,
@@ -92,6 +96,8 @@ impl<'a> Cursor<'a> {
             reader,
             limits,
             used: 0,
+            received: 0,
+            subtype_steps: 0,
             depth: 0,
             pending: None,
             subtypes: BTreeMap::new(),
@@ -153,6 +159,15 @@ impl<'a> Cursor<'a> {
             return self.fail(Rejection::TooManyValues);
         }
         self.used += 1;
+        Ok(())
+    }
+
+    /// Count one value handed to the receiver against [`Limits::received`].
+    pub(crate) fn receive(&mut self) -> Read<()> {
+        if self.received >= self.limits.received {
+            return self.fail(Rejection::TooManyReceived);
+        }
+        self.received += 1;
         Ok(())
     }
 
@@ -266,35 +281,50 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// `n` bytes, the elements of a `vec nat8`, each counted.
+    /// `n` bytes, the elements of a `vec nat8`, each handed to the receiver and counted.
     ///
     /// The one step the elements one by one would take, and the same rejection at the
-    /// same byte: each element is counted, then read, so the elements before the count or
-    /// the bytes run out are read, and the next one fails at the byte after them.
+    /// same byte: each element is handed out, counted, then read, so the elements before
+    /// one of those runs out are read, and the next one fails at the byte after them.
     pub(crate) fn bytes_counted(&mut self, n: u64) -> Read<&'a [u8]> {
+        let handed = self.limits.received - self.received;
         let room = self.limits.values - self.used;
         let left = self.reader.rest().len() as u64;
-        let whole = n.min(room).min(left);
+        let whole = n.min(handed).min(room).min(left);
         let bytes = self.reader.bytes(whole)?;
+        self.received += whole;
         self.used += whole;
         if whole == n {
             return Ok(bytes);
         }
-        // The next element: its count runs out, or else its byte does.
+        // The next element: it cannot be handed out, or its count runs out, or else its
+        // byte does.
+        self.receive()?;
         self.charge()?;
         self.fail(Rejection::EndOfInput)
     }
 
     /// Whether a reference of the sender's type `t` coerces to the receiver's `u`: whether
-    /// `t` is a subtype of `u`. Asked once for each pair of entries.
-    pub(crate) fn coerces(&mut self, t: Root<'_>, u: Root<'_>) -> bool {
-        let (Slot::Ref(a), Slot::Ref(b)) = (t.slot(), u.slot()) else {
-            return is_subtype(t, u);
+    /// `t` is a subtype of `u`. Asked once for each pair of entries, within what is left
+    /// of [`Limits::subtype_steps`].
+    pub(crate) fn coerces(&mut self, t: Root<'_>, u: Root<'_>) -> Read<bool> {
+        let key = match (t.slot(), u.slot()) {
+            (Slot::Ref(a), Slot::Ref(b)) => Some((a.index(), b.index())),
+            _ => None,
         };
-        *self
-            .subtypes
-            .entry((a.index(), b.index()))
-            .or_insert_with(|| is_subtype(t, u))
+        if let Some(&known) = key.and_then(|k| self.subtypes.get(&k)) {
+            return Ok(known);
+        }
+        let mut left = self.limits.subtype_steps.saturating_sub(self.subtype_steps);
+        let answer = is_subtype_within(t, u, &mut left);
+        self.subtype_steps = self.limits.subtype_steps - left;
+        let Some(answer) = answer else {
+            return self.fail(Rejection::TooManySubtypeSteps);
+        };
+        if let Some(k) = key {
+            self.subtypes.insert(k, answer);
+        }
+        Ok(answer)
     }
 
     /// Skip the value the receiver is at: read it at the sender's type, count it and

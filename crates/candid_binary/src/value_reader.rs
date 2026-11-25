@@ -134,20 +134,22 @@ type Outcome<T> = Result<Option<T>, DecodeError>;
 
 impl<'r, 'a> ValueReader<'r, 'a> {
     /// A reader of `value`, which is handed out: the one handing it out skips it if the
-    /// receiver does not read it.
+    /// receiver does not read it. Counted against [`Limits::received`](crate::Limits::received),
+    /// whether the message has the value or not.
     pub(crate) fn new(
         cursor: &'r mut Cursor<'a>,
         sender: &'r TypeTable,
         value: Option<Pending>,
         expected: Root<'r>,
-    ) -> Self {
+    ) -> Read<Self> {
+        cursor.receive()?;
         cursor.pending = value;
-        ValueReader {
+        Ok(ValueReader {
             cursor,
             sender,
             value,
             expected,
-        }
+        })
     }
 
     /// The receiver's type for this value.
@@ -372,7 +374,7 @@ impl<'r, 'a> ValueReader<'r, 'a> {
                 self.begin();
                 self.cursor.charge()?;
                 let id = self.cursor.id()?;
-                Ok(self.reference_coerces(p).then_some(id))
+                Ok(self.reference_coerces(p)?.then_some(id))
             }
             _ => self.skip().map(|()| None),
         }
@@ -390,16 +392,16 @@ impl<'r, 'a> ValueReader<'r, 'a> {
                 self.begin();
                 self.cursor.charge()?;
                 let reference = self.cursor.func()?;
-                Ok(self.reference_coerces(p).then_some(reference))
+                Ok(self.reference_coerces(p)?.then_some(reference))
             }
             _ => self.skip().map(|()| None),
         }
     }
 
-    fn reference_coerces(&mut self, p: Pending) -> bool {
+    fn reference_coerces(&mut self, p: Pending) -> Read<bool> {
         match self.sender.root(p.slot) {
             Some(t) => self.cursor.coerces(t, self.expected),
-            None => false,
+            None => Ok(false),
         }
     }
 
@@ -487,7 +489,7 @@ impl<'r, 'a> ValueReader<'r, 'a> {
         read: impl FnOnce(ValueReader<'_, 'a>) -> Outcome<T>,
     ) -> Outcome<T> {
         self.cursor.enter()?;
-        let v = read(ValueReader::new(self.cursor, self.sender, value, u))?;
+        let v = read(ValueReader::new(self.cursor, self.sender, value, u)?)?;
         self.cursor.settle(self.sender)?;
         self.cursor.leave();
         Ok(v)
@@ -552,7 +554,11 @@ impl<'r, 'a> ValueReader<'r, 'a> {
         if t == Slot::NAT8 {
             return self.cursor.bytes_counted(n).map(Some);
         }
-        // Another element type: the empty vector coerces, and no other.
+        // Another element type: the empty vector coerces, and no other. The first element
+        // would be handed out, and fail.
+        if n > 0 {
+            self.cursor.receive()?;
+        }
         self.cursor.skip_elements(self.sender, t, n)?;
         Ok((n == 0).then_some(&[]))
     }
@@ -725,7 +731,7 @@ impl<'a> RecordReader<'_, 'a> {
             });
         };
         self.cursor.enter()?;
-        let v = read(ValueReader::new(self.cursor, self.sender, value, u))?;
+        let v = read(ValueReader::new(self.cursor, self.sender, value, u)?)?;
         self.cursor.settle(self.sender)?;
         self.cursor.leave();
         if v.is_none() {
@@ -922,6 +928,44 @@ mod tests {
             ..Limits::default()
         };
         assert_eq!(both(&bytes, flat).rejection(), &Rejection::TooDeep);
+        // Each element would be handed to the receiver: the vector and the first are.
+        let handed = Limits {
+            received: 2,
+            ..Limits::default()
+        };
+        let e = both(&bytes, handed);
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (bytes.len() - 1, &Rejection::TooManyReceived)
+        );
+        // Handed out, then counted: the first of the two to run out is the answer.
+        let e = both(
+            &bytes,
+            Limits {
+                values: 2,
+                ..handed
+            },
+        );
+        assert_eq!(e.rejection(), &Rejection::TooManyReceived);
+        // Elements of another type: the first is handed out, and fails.
+        let ints = vec![Composite::Vec(Slot::INT8)];
+        let bytes = message(ints, r(0), |w| {
+            let mut v = w.vec(2)?;
+            v.element()?.int8(1)?;
+            v.element()?.int8(2)?;
+            v.finish()
+        });
+        let t = table(vec![Composite::Vec(Slot::NAT8)]);
+        for (received, want) in [(1, Err(Rejection::TooManyReceived)), (2, Ok(None))] {
+            let limits = Limits {
+                received,
+                ..Limits::default()
+            };
+            let blob = read(&bytes, &t, r(0), limits, |r| r.blob()).map(|b| b.map(<[u8]>::to_vec));
+            let each = read(&bytes, &t, r(0), limits, |r| r.vec(|e| e.nat8()));
+            assert_eq!(blob, each);
+            assert_eq!(blob.map_err(|e| e.rejection().clone()), want);
+        }
         let empty = message(vec![Composite::Vec(Slot::NAT8)], r(0), |w| w.blob(&[]));
         let blob = read(&empty, &t, r(0), flat, |r| r.blob());
         assert_eq!(blob, Ok(Some(&[][..])));
@@ -1206,17 +1250,11 @@ mod tests {
     /// The least depth at which `decode` gets past a message's values: below it,
     /// `TooDeep`.
     fn least_depth(decode: impl Fn(Limits) -> Result<(), DecodeError>) -> usize {
-        let at = |depth| {
-            decode(Limits {
-                depth,
-                ..Limits::default()
-            })
+        let with = |depth| Limits {
+            depth: depth as usize,
+            ..Limits::default()
         };
-        let least = (1..64)
-            .find(|&d| at(d).is_ok())
-            .expect("decodes within 64 levels");
-        assert_eq!(at(least - 1).unwrap_err().rejection(), &Rejection::TooDeep);
-        least
+        least(with, Rejection::TooDeep, decode) as usize
     }
 
     #[test]
@@ -1290,6 +1328,105 @@ mod tests {
             }))
         };
         assert_eq!(least_depth(rest), 9);
+    }
+
+    /// The least `limit` for which `decode` succeeds, given limits from `with`: below
+    /// it, the rejection `over`.
+    fn least(
+        with: impl Fn(u64) -> Limits,
+        over: Rejection,
+        decode: impl Fn(Limits) -> Result<(), DecodeError>,
+    ) -> u64 {
+        let least = (1..10_000)
+            .find(|&n| decode(with(n)).is_ok())
+            .expect("decodes within 10,000");
+        assert_eq!(decode(with(least - 1)).unwrap_err().rejection(), &over);
+        least
+    }
+
+    fn received(n: u64) -> Limits {
+        Limits {
+            received: n,
+            ..Limits::default()
+        }
+    }
+
+    #[test]
+    fn values_handed_to_the_receiver_are_counted() {
+        let decoded = |r: Outcome<Discard>| r.map(drop);
+        let least_received = |bytes: &[u8], t: &TypeTable, u: Slot| {
+            least(received, Rejection::TooManyReceived, |l| {
+                decoded(read(bytes, t, u, l, Discard::try_decode))
+            })
+        };
+        // Ten empty records, read as records of three `opt nat`s the sender does not
+        // have: the argument, ten elements, thirty fields, in two values of the message.
+        let bytes = [b"DIDL".as_slice(), &[2, 0x6c, 0, 0x6d, 0, 1, 1, 10]].concat();
+        let fields = (0..3).map(|i| (FieldId::new(i), r(2))).collect();
+        let t = table(vec![
+            Composite::Record(fields),
+            Composite::Vec(r(0)),
+            Composite::Opt(Slot::NAT),
+        ]);
+        assert_eq!(least_received(&bytes, &t, r(1)), 41);
+        // A `nat` read as `opt opt nat`: an `opt` around it is a value the message lacks.
+        let bytes = [b"DIDL".as_slice(), &[0, 1, 0x7d, 5]].concat();
+        let t = table(vec![Composite::Opt(r(1)), Composite::Opt(Slot::NAT)]);
+        assert_eq!(least_received(&bytes, &t, r(0)), 3);
+        // An argument past the sender's last.
+        let bytes = [b"DIDL".as_slice(), &[0, 0]].concat();
+        assert_eq!(least_received(&bytes, &t, r(1)), 1);
+    }
+
+    #[test]
+    fn reference_checks_are_counted_once_for_each_pair() {
+        // References of `func (V) -> ()`, where `V` is a cycle of three
+        // `variant { 0: next; 1: null }`, read at `func (P) -> ()`, with `P` the same in
+        // one entry. The message's table has those four entries and `extra`, at most one.
+        let message = |extra: &[u8], types: &[u8], values: &[u8], references: u8| {
+            let mut m = b"DIDL".to_vec();
+            m.push(4 + u8::from(!extra.is_empty()));
+            m.extend([0x6b, 2, 0, 1, 1, 0x7f, 0x6b, 2, 0, 2, 1, 0x7f]);
+            m.extend([0x6b, 2, 0, 0, 1, 0x7f, 0x6a, 1, 0, 0, 0]);
+            m.extend(extra);
+            m.extend(types);
+            m.extend(values);
+            for _ in 0..references {
+                m.extend([1, 1, 1, 0x2a, 1, b'f']);
+            }
+            m
+        };
+        let t = table(vec![
+            Composite::Variant(vec![(FieldId::new(0), r(0)), (FieldId::new(1), Slot::NULL)]),
+            Composite::Func {
+                parameters: vec![r(0)],
+                results: vec![],
+                annotations: vec![],
+            },
+            Composite::Vec(r(1)),
+        ]);
+        let steps = |bytes: &[u8], arguments: Slot, count: usize| {
+            let with = |steps| Limits {
+                subtype_steps: steps,
+                ..Limits::default()
+            };
+            least(with, Rejection::TooManySubtypeSteps, |l| {
+                let mut d = Decoder::with_limits(bytes, l)?;
+                for _ in 0..count {
+                    d.argument_with(t.root(arguments).unwrap(), Discard::try_decode)?;
+                }
+                d.finish()
+            })
+        };
+        // A vector of `n` references: one argument, one check.
+        let vector = |n| message(&[0x6d, 3], &[1, 4], &[n], n);
+        let one = steps(&vector(1), r(2), 1);
+        assert!(one > 3, "{one} steps for a cycle of three");
+        assert_eq!(steps(&vector(4), r(2), 1), one);
+        // Two arguments, each a reference: the answers are kept for one receiver's table,
+        // and so for one argument, but the steps are the message's.
+        let two = message(&[], &[2, 3, 3], &[], 2);
+        assert_eq!(steps(&two, r(1), 2), 2 * one);
     }
 
     #[test]

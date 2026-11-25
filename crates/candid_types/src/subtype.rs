@@ -36,8 +36,19 @@ use crate::table::{Root, TypeTable};
 ///
 /// Lean's `decSubtype`. Every step either records a pair of references, of which there
 /// are at most the product of the two tables' sizes, or discharges an obligation, so
-/// this terminates without a depth limit.
+/// this terminates without a depth limit. That can still be many steps, for two tables
+/// from untrusted bytes: [`is_subtype_within`] stops at a budget.
 pub fn is_subtype(subtype: Root<'_>, supertype: Root<'_>) -> bool {
+    let mut steps = u64::MAX;
+    is_subtype_within(subtype, supertype, &mut steps) == Some(true)
+}
+
+/// Whether `subtype <: supertype`, as [`is_subtype`], within `steps`: each obligation
+/// taken up is one, and unfolding a pair of entries is one more for each of their
+/// parts -- fields, alternatives, methods, parameters, results, annotations, bytes of a
+/// future type -- since it may look at each. `steps` is left with what is not used.
+/// `None` if they run out first.
+pub fn is_subtype_within(subtype: Root<'_>, supertype: Root<'_>, steps: &mut u64) -> Option<bool> {
     let (a, b) = (subtype.table(), supertype.table());
     let mut assumed = BTreeSet::new();
     let mut assumed_reverse = BTreeSet::new();
@@ -47,6 +58,7 @@ pub fn is_subtype(subtype: Root<'_>, supertype: Root<'_>) -> bool {
         supertype: supertype.slot(),
     }];
     while let Some(goal) = goals.pop() {
+        *steps = steps.checked_sub(1)?;
         // `forward` says which way round the tables are: the subtype in `a` and the
         // supertype in `b`, or, for a function's parameters, the reverse.
         let (t, u, assumed) = if goal.forward {
@@ -61,26 +73,27 @@ pub fn is_subtype(subtype: Root<'_>, supertype: Root<'_>) -> bool {
                 // Both resolve: the roots do, and in a checked table so does every
                 // slot an entry holds.
                 let (Some(x), Some(y)) = (t.lookup(i), u.lookup(j)) else {
-                    return false;
+                    return Some(false);
                 };
                 if !assumed.insert((i, j)) {
                     continue;
                 }
+                *steps = steps.checked_sub(width(x).saturating_add(width(y)))?;
                 match expand(t, u, goal.forward, x, y) {
                     // Reversed, so that they are taken in order: the model puts them at
                     // the front of its list, and this pops from the back.
                     Some(next) => goals.extend(next.into_iter().rev()),
-                    None => return false,
+                    None => return Some(false),
                 }
             }
             (s, v) => {
                 if !leaf(t, u, s, v) {
-                    return false;
+                    return Some(false);
                 }
             }
         }
     }
-    true
+    Some(true)
 }
 
 /// An obligation `subtype <: supertype`. `forward` says which table each is in; see
@@ -207,6 +220,22 @@ fn expand(
     }
 }
 
+/// How many parts unfolding `c` may look at.
+fn width(c: &Composite) -> u64 {
+    let n = match c {
+        Composite::Opt(_) | Composite::Vec(_) => 1,
+        Composite::Record(fs) | Composite::Variant(fs) => fs.len(),
+        Composite::Func {
+            parameters,
+            results,
+            annotations,
+        } => parameters.len() + results.len() + annotations.len(),
+        Composite::Service(ms) => ms.len(),
+        Composite::Future { data, .. } => data.len(),
+    };
+    n as u64
+}
+
 /// The record rule over positions: each of `supertypes` is either matched by the
 /// subtype at the same position -- an obligation -- or absent there, which it may be only
 /// if it accepts `null` in `table`, the supertype's.
@@ -266,6 +295,46 @@ mod tests {
             results,
             annotations: Vec::new(),
         }
+    }
+
+    #[test]
+    fn a_check_stops_where_its_steps_run_out() {
+        // `record { 0: nat; 1: record {...} }` against the same with `int`: a few steps.
+        let mut raw = RawTypeTable::new();
+        let inner = raw.intern(Composite::Record(vec![(FieldId::new(0), Slot::NAT)]));
+        let outer = raw.intern(Composite::Record(vec![
+            (FieldId::new(0), Slot::NAT),
+            (FieldId::new(1), inner),
+        ]));
+        let mut wider = RawTypeTable::new();
+        let w_inner = wider.intern(Composite::Record(vec![(FieldId::new(0), Slot::INT)]));
+        let w_outer = wider.intern(Composite::Record(vec![
+            (FieldId::new(0), Slot::INT),
+            (FieldId::new(1), w_inner),
+        ]));
+        let (a, b) = (checked(raw), checked(wider));
+        let (t, u) = (a.root(outer).unwrap(), b.root(w_outer).unwrap());
+        let mut left = 100;
+        assert_eq!(is_subtype_within(t, u, &mut left), Some(true));
+        let used = 100 - left;
+        // A step for each pair -- the two records, the inner two, two `nat <: int` -- and
+        // one for each field the records have: 2 + 2 + 1 + 1.
+        assert_eq!(used, 10);
+        let mut exact = used;
+        assert_eq!(is_subtype_within(t, u, &mut exact), Some(true));
+        assert_eq!(exact, 0);
+        assert_eq!(is_subtype_within(t, u, &mut (used - 1)), None);
+
+        // A record without fields against one of a thousand that accept `null`: one pair,
+        // but each of the thousand is looked at.
+        let mut raw = RawTypeTable::new();
+        let none = raw.intern(Composite::Record(vec![]));
+        let nulls = (0..1000).map(|i| (FieldId::new(i), Slot::NULL)).collect();
+        let wide = raw.intern(Composite::Record(nulls));
+        let a = checked(raw);
+        let mut left = 10_000;
+        let answer = is_subtype_within(a.root(none).unwrap(), a.root(wide).unwrap(), &mut left);
+        assert_eq!((answer, 10_000 - left), (Some(true), 1001));
     }
 
     #[test]

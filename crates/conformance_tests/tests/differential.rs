@@ -106,6 +106,8 @@ fn check(i: usize, case: &Value) -> Result<Verdict, String> {
     limits.values = limit;
     limits.header_bytes = usize::MAX;
     limits.depth = usize::MAX;
+    limits.received = u64::MAX;
+    limits.subtype_steps = u64::MAX;
     let got = match decode(&bytes, &receiver, limits, &mut Reading::Value) {
         Ok(got) => got,
         // A future type's opcode past an `i64`: a resource limit of this decoder alone,
