@@ -407,14 +407,18 @@ impl<'r, 'a> ValueReader<'r, 'a> {
 
     /// At a type from a later version of Candid: a value of that same type, which is
     /// skipped, since nothing more of it can be known.
-    pub fn future(self) -> Outcome<()> {
-        let Some(Composite::Future { opcode, data }) = self.composite() else {
+    pub fn future(mut self) -> Outcome<()> {
+        let Some(Composite::Future { .. }) = self.composite() else {
             return Err(self.mismatch("future"));
         };
-        let same = self.value.is_some_and(|p| {
-            matches!(self.sender_composite(p),
-                Some(Composite::Future { opcode: o, data: d }) if o == opcode && d == data)
-        });
+        // Two future types are the same when one is a subtype of the other; asking it so
+        // compares them once for each pair, and counts the comparison.
+        let same = match self.value {
+            Some(p) if matches!(self.sender_composite(p), Some(Composite::Future { .. })) => {
+                self.reference_coerces(p)?
+            }
+            _ => false,
+        };
         self.skip()?;
         Ok(same.then_some(()))
     }
@@ -1427,6 +1431,45 @@ mod tests {
         // and so for one argument, but the steps are the message's.
         let two = message(&[], &[2, 3, 3], &[], 2);
         assert_eq!(steps(&two, r(1), 2), 2 * one);
+    }
+
+    #[test]
+    fn future_types_are_compared_once_for_each_pair() {
+        // `vec F`, with `F` a future type of 100 bytes, and `n` values of it.
+        let data = vec![7u8; 100];
+        let vector = |n: u8| {
+            let mut m = b"DIDL".to_vec();
+            m.extend([2, 0x67, 100]);
+            m.extend(&data);
+            m.extend([0x6d, 0, 1, 1, n]);
+            for _ in 0..n {
+                m.extend([0, 0]);
+            }
+            m
+        };
+        let t = table(vec![
+            Composite::Future {
+                opcode: -25,
+                data: data.clone(),
+            },
+            Composite::Vec(r(0)),
+        ]);
+        let steps = |bytes: &[u8]| {
+            let with = |steps| Limits {
+                subtype_steps: steps,
+                ..Limits::default()
+            };
+            least(with, Rejection::TooManySubtypeSteps, |l| {
+                read(bytes, &t, r(1), l, |r| r.vec(|r| r.future())).map(drop)
+            })
+        };
+        let one = steps(&vector(1));
+        assert!(one > 200, "{one} steps for 100 bytes on each side");
+        assert_eq!(steps(&vector(100)), one);
+        let all = read(&vector(3), &t, r(1), Limits::default(), |r| {
+            r.vec(|r| r.future())
+        });
+        assert_eq!(all, Ok(Some(vec![(); 3])));
     }
 
     #[test]

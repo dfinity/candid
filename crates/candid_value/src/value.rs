@@ -226,7 +226,9 @@ impl<'a> Decode<'a> for Value {
             }
             (_, Some(Composite::Vec(_))) => reader.vec(Value::try_decode)?.map(Value::Vec),
             (_, Some(Composite::Record(fields))) => reader.record(|r| {
-                let mut values = Vec::with_capacity(fields.len());
+                // Grown as fields are read, each counted first: the receiver's type may
+                // have more fields than the message is allowed to hand it.
+                let mut values = Vec::new();
                 for &(id, _) in fields {
                     match r.field(id, Value::try_decode)? {
                         Some(v) => values.push((id, v)),
