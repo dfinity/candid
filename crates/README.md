@@ -298,8 +298,8 @@ differential test turns them off. What they bound, as measured:
   optional `decoding_quota` is set.
 - **References are checked by subtyping, which the sender's types can make long.** A
   check takes a step for each pair of slots, up to the product of the two tables' sizes,
-  and each of their parts, and every distinct pair of entries is checked in each
-  argument. 2,500 `func` types sharing a cycle of
+  and each of their parts, a method's name by its bytes, and every distinct pair of
+  entries is checked in each argument. 2,500 `func` types sharing a cycle of
   5,000 variants, in a 77 KB message, took 1.8 s, the checks true or false. 0.10 keeps the
   pairs it has proven for the message, which makes the true ones fast, and takes 19 s on
   the false ones. `subtype_steps` stops the message at its default of 2²⁰ steps, in

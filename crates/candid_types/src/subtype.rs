@@ -45,8 +45,8 @@ pub fn is_subtype(subtype: Root<'_>, supertype: Root<'_>) -> bool {
 
 /// Whether `subtype <: supertype`, as [`is_subtype`], within `steps`: each obligation
 /// taken up is one, and unfolding a pair of entries is one more for each of their
-/// parts -- fields, alternatives, methods, parameters, results, annotations, bytes of a
-/// future type -- since it may look at each. `steps` is left with what is not used.
+/// parts -- fields, alternatives, methods and each byte of their names, parameters,
+/// results, annotations, bytes of a future type -- since it may look at each. `steps` is left with what is not used.
 /// `None` if they run out first.
 pub fn is_subtype_within(subtype: Root<'_>, supertype: Root<'_>, steps: &mut u64) -> Option<bool> {
     let (a, b) = (subtype.table(), supertype.table());
@@ -220,7 +220,8 @@ fn expand(
     }
 }
 
-/// How many parts unfolding `c` may look at.
+/// How many parts unfolding `c` may look at. A method's name counts a part for each of
+/// its bytes too, since methods are found by comparing names.
 fn width(c: &Composite) -> u64 {
     let n = match c {
         Composite::Opt(_) | Composite::Vec(_) => 1,
@@ -230,7 +231,7 @@ fn width(c: &Composite) -> u64 {
             results,
             annotations,
         } => parameters.len() + results.len() + annotations.len(),
-        Composite::Service(ms) => ms.len(),
+        Composite::Service(ms) => ms.iter().map(|(name, _)| 1 + name.len()).sum(),
         Composite::Future { data, .. } => data.len(),
     };
     n as u64
@@ -335,6 +336,19 @@ mod tests {
         let mut left = 10_000;
         let answer = is_subtype_within(a.root(none).unwrap(), a.root(wide).unwrap(), &mut left);
         assert_eq!((answer, 10_000 - left), (Some(true), 1001));
+
+        // A service of one method, named in a thousand bytes, against itself: a step for
+        // each pair -- the services, the methods -- and the method and its name on each
+        // side.
+        let mut raw = RawTypeTable::new();
+        let name = "m".repeat(1000);
+        let method = raw.intern(func(vec![], vec![]));
+        let service = raw.intern(Composite::Service(vec![(name, method)]));
+        let a = checked(raw);
+        let s = a.root(service).unwrap();
+        let mut left = 10_000;
+        assert_eq!(is_subtype_within(s, s, &mut left), Some(true));
+        assert_eq!(10_000 - left, 2 + 2 * 1001);
     }
 
     #[test]
