@@ -1466,7 +1466,9 @@ mod tests {
         let one = steps(&vector(1));
         assert!(one > 200, "{one} steps for 100 bytes on each side");
         assert_eq!(steps(&vector(100)), one);
-        let all = read(&vector(3), &t, r(1), Limits::default(), |r| r.vec(|r| r.future()));
+        let all = read(&vector(3), &t, r(1), Limits::default(), |r| {
+            r.vec(|r| r.future())
+        });
         assert_eq!(all, Ok(Some(vec![(); 3])));
     }
 
