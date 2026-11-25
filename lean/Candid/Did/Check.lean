@@ -39,26 +39,26 @@ structure Interface where
   initialization arguments. -/
   service : Option (Option (List Slot) × Slot)
 
-def ownsEntry : TypeExpr → Bool
-  | .name _ | .prim _ => false
+def ownsEntry : TypeExpression → Bool
+  | .name _ | .primitive _ => false
   | _ => true
 
 /-- The slot a defined name denotes. `owned` gives the reserved entry of each name whose
 definition is composite. -/
-def resolveName (defs : List (String × TypeExpr)) (owned : String → Option Slot) :
+def resolveName (defs : List (String × TypeExpression)) (owned : String → Option Slot) :
     Nat → String → Except String Slot
   | 0, x => throw s!"type name {x} is not productive"
   | n + 1, x =>
     match defs.lookup x with
     | none => throw s!"unbound type name {x}"
     | some (.name y) => resolveName defs owned n y
-    | some (.prim p) => return .prim p
+    | some (.primitive p) => return .primitive p
     | some _ => match owned x with
       | some s => return s
       | none => throw s!"unreachable: {x} owns no entry"
 
 /-- Flatten each composite definition into the entry reserved for it. -/
-def fillEntries (env : String → Option Slot) : List (Nat × TypeExpr) → FlatM Unit
+def fillEntries (env : String → Option Slot) : List (Nat × TypeExpression) → FlatM Unit
   | [] => return
   | (k, t) :: rest => do
     let _ ← flatten env t
@@ -68,15 +68,15 @@ def fillEntries (env : String → Option Slot) : List (Nat × TypeExpr) → Flat
     | none => throw "unreachable: flattening a composite pushed nothing"
     fillEntries env rest
 
-def checkDesc (d : Desc) : Except String Interface := do
-  let names := d.defs.map (·.1)
+def checkDescription (d : Description) : Except String Interface := do
+  let names := d.definitions.map (·.1)
   unless noDups names do throw "a type name is defined twice"
-  if let some x := names.find? (primOfName? · |>.isSome) then
+  if let some x := names.find? (primitiveOfName? · |>.isSome) then
     throw s!"{x} is the name of a primitive type"
-  let owners := (d.defs.filter (ownsEntry ·.2))
+  let owners := (d.definitions.filter (ownsEntry ·.2))
   let owned (x : String) : Option Slot :=
     (owners.findIdx? (·.1 == x)).map .ref
-  let slots ← names.mapM (resolveName d.defs owned d.defs.length)
+  let slots ← names.mapM (resolveName d.definitions owned d.definitions.length)
   let types := names.zip slots
   let env (x : String) := types.lookup x
   let build : FlatM (Option (Option (List Slot) × Slot)) := do
@@ -94,19 +94,34 @@ def checkDesc (d : Desc) : Except String Interface := do
     | .ref r => match table.lookup? r with
       | some (.service _) => pure ()
       | _ => throw "the service declaration is not a service type"
-    | .prim _ => throw "the service declaration is not a service type"
+    | .primitive _ => throw "the service declaration is not a service type"
   return { table, types, service }
 
 /-- The interface of the description `src`, read at `rootLocation` with the environment
-`files` to read its imports from, or why it is rejected. -/
-def checkDescIn (files : Files) (src : String) : Except String Interface :=
-  expand ((rootLocation, src) :: files) >>= checkDesc
+`files` to read its imports from, or why it is rejected. Each of its imports, direct or
+indirect, must be valid on its own (Section 5.3): it is read the same way, as the
+description being read, though the expansion discards its service declaration.
 
-/-- As `checkDescIn`, `none` when the description is rejected. -/
-def readDescIn (files : Files) (src : String) : Option Interface :=
-  (checkDescIn files src).toOption
+The descriptions are loaded and parsed once. An import is checked again on its own only
+if it has a service declaration: one without is valid on its own once the expansion of
+`src` is. Its definitions are among those of that expansion, and use only names it or
+its imports define. The methods it merges by `import service` are checked where they are
+declared, and their names were checked to be distinct when `src` was expanded. -/
+def checkDescriptionIn (files : Files) (src : String) : Except String Interface := do
+  let all ← loadAll ((rootLocation, src) :: files) rootLocation
+  let i ← expandLoaded all rootLocation >>= checkDescription
+  for l in all do
+    if l.location != rootLocation && l.description.service.isSome then
+      match expandLoaded (within all l.location) l.location >>= checkDescription with
+      | .ok _ => pure ()
+      | .error e => throw s!"{l.location} is not valid on its own: {e}"
+  return i
+
+/-- As `checkDescriptionIn`, `none` when the description is rejected. -/
+def readDescriptionIn (files : Files) (src : String) : Option Interface :=
+  (checkDescriptionIn files src).toOption
 
 /-- A description with nothing to import from. -/
-def readDesc (src : String) : Option Interface := readDescIn [] src
+def readDescription (src : String) : Option Interface := readDescriptionIn [] src
 
 end Candid.Did

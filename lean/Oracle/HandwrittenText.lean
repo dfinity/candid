@@ -4,8 +4,8 @@ following `lean/Spec/TextValues.md`. As in `Oracle/Handwritten.lean`, each expec
 is written down from the document rather than computed by the model, and the ids say
 what each case shows. Section numbers in the ids are the document's.
 
-Where `candid` 0.10 answers differently, the document's Appendix B.2 says why; the
-runner lists those vectors as known divergences.
+Where an implementation is known to answer differently, the document's Appendix B.2
+says so.
 -/
 
 import Oracle.Handwritten
@@ -16,25 +16,25 @@ open Candid
 open Candid.Slot
 open Candid.Composite
 
-def expectParse (text : String) (ts : TypeSeq) (want : Option (List Value)) (id : String) :
+def expectParse (text : String) (ts : TypeSequence) (want : Option (List Value)) (id : String) :
     Vector :=
   ⟨s!"text: {id}", .parse text ts want⟩
 
 /-- One type that is one composite. -/
-def oneOf (c : Composite) : TypeSeq := typesOf do return [← intern c]
+def oneOf (c : Composite) : TypeSequence := typesOf do return [← intern c]
 
-def accepts (text : String) (ts : TypeSeq) (vs : List Value) (id : String) : Vector :=
+def accepts (text : String) (ts : TypeSequence) (vs : List Value) (id : String) : Vector :=
   expectParse text ts (some vs) id
 
-def rejects (text : String) (ts : TypeSeq) (id : String) : Vector :=
+def rejects (text : String) (ts : TypeSequence) (id : String) : Vector :=
   expectParse text ts none id
 
 /-! ## Lexical structure (Section 3) -/
 
 def textLexChecks : List Vector :=
-  [ accepts "( /* a /* nested */ b */ 1 // to the end of the line\n )" (prims [nat]) [.nat 1]
+  [ accepts "( /* a /* nested */ b */ 1 // to the end of the line\n )" (primitives [nat]) [.nat 1]
       "comments nest, and a line comment ends at the line feed (3.2)"
-  , rejects "(1 /* unclosed)" (prims [nat]) "an unclosed block comment (3.2)"
+  , rejects "(1 /* unclosed)" (primitives [nat]) "an unclosed block comment (3.2)"
   , rejects "(record { opt = 1 })" (oneOf (recordOf [("opt", nat)]))
       "a keyword is not a field name (3.3)"
   , accepts "(record { \"opt\" = 1 })" (oneOf (recordOf [("opt", nat)]))
@@ -47,76 +47,76 @@ def textLexChecks : List Vector :=
 /-! ## Numbers (Sections 3.4 and 5.3) -/
 
 def textIntChecks : List Vector :=
-  [ accepts "(1_000)" (prims [nat]) [.nat 1000] "an underscore separates digits (3.4)"
-  , rejects "(1_)" (prims [nat]) "an underscore cannot end a number (3.4)"
-  , rejects "(1__0)" (prims [nat]) "an underscore cannot follow another (3.4)"
-  , rejects "(0x_ff)" (prims [nat]) "an underscore cannot begin the digits (3.4)"
-  , accepts "(0xFF)" (prims [nat]) [.nat 255] "hexadecimal digits in either case (3.4)"
-  , rejects "(0X10)" (prims [nat]) "the hexadecimal prefix is lowercase (3.4)"
-  , accepts "(+5)" (prims [nat]) [.nat 5] "a signed literal at nat (5.3)"
-  , accepts "(-0)" (prims [nat]) [.nat 0] "minus zero at nat (5.3)"
-  , rejects "(-1)" (prims [nat]) "a negative literal at nat (5.3)"
-  , rejects "(- 5)" (prims [int]) "a sign is part of its number (3.4)"
-  , accepts "(-0x10)" (prims [int]) [.int (-16)] "a signed hexadecimal literal (3.4)"
+  [ accepts "(1_000)" (primitives [nat]) [.nat 1000] "an underscore separates digits (3.4)"
+  , rejects "(1_)" (primitives [nat]) "an underscore cannot end a number (3.4)"
+  , rejects "(1__0)" (primitives [nat]) "an underscore cannot follow another (3.4)"
+  , rejects "(0x_ff)" (primitives [nat]) "an underscore cannot begin the digits (3.4)"
+  , accepts "(0xFF)" (primitives [nat]) [.nat 255] "hexadecimal digits in either case (3.4)"
+  , rejects "(0X10)" (primitives [nat]) "the hexadecimal prefix is lowercase (3.4)"
+  , accepts "(+5)" (primitives [nat]) [.nat 5] "a signed literal at nat (5.3)"
+  , accepts "(-0)" (primitives [nat]) [.nat 0] "minus zero at nat (5.3)"
+  , rejects "(-1)" (primitives [nat]) "a negative literal at nat (5.3)"
+  , rejects "(- 5)" (primitives [int]) "a sign is part of its number (3.4)"
+  , accepts "(-0x10)" (primitives [int]) [.int (-16)] "a signed hexadecimal literal (3.4)"
   , accepts "(255, -128, 18446744073709551615, -9223372036854775808)"
-      (prims [nat8, int8, nat64, int64])
+      (primitives [nat8, int8, nat64, int64])
       [.nat8 255, .int8 (-128), .nat64 18446744073709551615, .int64 (-9223372036854775808)]
       "the ends of the fixed-width ranges (5.3)"
-  , rejects "(256)" (prims [nat8]) "past the top of nat8 (5.3)"
-  , rejects "(-129)" (prims [int8]) "past the bottom of int8 (5.3)"
-  , rejects "(1)" (prims [float64]) "an integer literal at a float type (5.3)"
-  , rejects "(1.0)" (prims [nat]) "a float literal at an integer type (5.3)" ]
+  , rejects "(256)" (primitives [nat8]) "past the top of nat8 (5.3)"
+  , rejects "(-129)" (primitives [int8]) "past the bottom of int8 (5.3)"
+  , rejects "(1)" (primitives [float64]) "an integer literal at a float type (5.3)"
+  , rejects "(1.0)" (primitives [nat]) "a float literal at an integer type (5.3)" ]
 
 def textFloatChecks : List Vector :=
-  [ accepts "(1.5)" (prims [float32]) [.float32 0x3fc00000] "1.5 at float32 (5.3)"
-  , accepts "(0.1, 0.1)" (prims [float32, float64]) [.float32 0x3dcccccd, .float64 0x3fb999999999999a]
+  [ accepts "(1.5)" (primitives [float32]) [.float32 0x3fc00000] "1.5 at float32 (5.3)"
+  , accepts "(0.1, 0.1)" (primitives [float32, float64]) [.float32 0x3dcccccd, .float64 0x3fb999999999999a]
       "0.1 rounded to each format (5.3)"
-  , accepts "(1.0000000596046448)" (prims [float32]) [.float32 0x3f800001]
+  , accepts "(1.0000000596046448)" (primitives [float32]) [.float32 0x3f800001]
       "rounded once, not first to float64 (5.3)"
-  , accepts "(1e400, 1e999999999)" (prims [float64, float64])
+  , accepts "(1e400, 1e999999999)" (primitives [float64, float64])
       [.float64 0x7ff0000000000000, .float64 0x7ff0000000000000] "overflow rounds to infinity (5.3)"
-  , accepts "(-1e-400, -0.0)" (prims [float64, float32])
+  , accepts "(-1e-400, -0.0)" (primitives [float64, float32])
       [.float64 0x8000000000000000, .float32 0x80000000] "a zero keeps the literal's sign (5.3)"
-  , accepts "(1_000.5)" (prims [float64]) [.float64 0x408f440000000000]
+  , accepts "(1_000.5)" (primitives [float64]) [.float64 0x408f440000000000]
       "an underscore in a float literal (3.4)"
-  , rejects "(.5)" (prims [float64]) "a float literal begins with a digit (3.4)"
-  , accepts "(5.)" (prims [float64]) [.float64 0x4014000000000000] "a point with no fraction (3.4)"
-  , accepts "(0x1p4, 0x1.8p1)" (prims [float64, float32])
+  , rejects "(.5)" (primitives [float64]) "a float literal begins with a digit (3.4)"
+  , accepts "(5.)" (primitives [float64]) [.float64 0x4014000000000000] "a point with no fraction (3.4)"
+  , accepts "(0x1p4, 0x1.8p1)" (primitives [float64, float32])
       [.float64 0x4030000000000000, .float32 0x40400000] "hexadecimal float literals (3.4)" ]
 
 /-- Rounding at the edges of each format (5.3). Each bit pattern is worked out by hand:
 float32 has a 24-bit significand and its least subnormal is 2^-149; float64 has 53 bits
 and 2^-1074. -/
 def textRoundingChecks : List Vector :=
-  [ accepts "(0x1p-149, -0x1p-149)" (prims [float32, float32])
+  [ accepts "(0x1p-149, -0x1p-149)" (primitives [float32, float32])
       [.float32 0x00000001, .float32 0x80000001] "the least float32 subnormal (5.3)"
-  , accepts "(0x1p-150, 0x1.8p-149)" (prims [float32, float32])
+  , accepts "(0x1p-150, 0x1.8p-149)" (primitives [float32, float32])
       [.float32 0x00000000, .float32 0x00000002]
       "a tie below the least float32 subnormal goes to zero, a tie above it goes up (5.3)"
-  , accepts "(0x7fffffp-149, 0xffffffp-150)" (prims [float32, float32])
+  , accepts "(0x7fffffp-149, 0xffffffp-150)" (primitives [float32, float32])
       [.float32 0x007fffff, .float32 0x00800000]
       "the greatest float32 subnormal, and a tie above it carries to the least normal (5.3)"
-  , accepts "(0x1.ffffffp0, 0x1.ffffffp127)" (prims [float32, float32])
+  , accepts "(0x1.ffffffp0, 0x1.ffffffp127)" (primitives [float32, float32])
       [.float32 0x40000000, .float32 0x7f800000]
       "a float32 tie that carries into the exponent, and past the greatest finite (5.3)"
-  , accepts "(16777217.0, 16777219.0)" (prims [float32, float32])
+  , accepts "(16777217.0, 16777219.0)" (primitives [float32, float32])
       [.float32 0x4b800000, .float32 0x4b800002] "decimal float32 ties go to even (5.3)"
-  , accepts "(1e-45)" (prims [float32]) [.float32 0x00000001]
+  , accepts "(1e-45)" (primitives [float32]) [.float32 0x00000001]
       "a decimal literal rounds to a nonzero float32 subnormal (5.3)"
-  , accepts "(0x1p-1074, -0x1p-1074)" (prims [float64, float64])
+  , accepts "(0x1p-1074, -0x1p-1074)" (primitives [float64, float64])
       [.float64 0x0000000000000001, .float64 0x8000000000000001] "the least float64 subnormal (5.3)"
-  , accepts "(0x1p-1075, 0x1.8p-1074)" (prims [float64, float64])
+  , accepts "(0x1p-1075, 0x1.8p-1074)" (primitives [float64, float64])
       [.float64 0x0000000000000000, .float64 0x0000000000000002]
       "a tie below the least float64 subnormal goes to zero, a tie above it goes up (5.3)"
-  , accepts "(0xfffffffffffffp-1074, 0x1fffffffffffffp-1075)" (prims [float64, float64])
+  , accepts "(0xfffffffffffffp-1074, 0x1fffffffffffffp-1075)" (primitives [float64, float64])
       [.float64 0x000fffffffffffff, .float64 0x0010000000000000]
       "the greatest float64 subnormal, and a tie above it carries to the least normal (5.3)"
-  , accepts "(0x1.fffffffffffff8p0, 0x1.fffffffffffff8p1023)" (prims [float64, float64])
+  , accepts "(0x1.fffffffffffff8p0, 0x1.fffffffffffff8p1023)" (primitives [float64, float64])
       [.float64 0x4000000000000000, .float64 0x7ff0000000000000]
       "a float64 tie that carries into the exponent, and past the greatest finite (5.3)"
-  , accepts "(9007199254740993.0, 9007199254740995.0)" (prims [float64, float64])
+  , accepts "(9007199254740993.0, 9007199254740995.0)" (primitives [float64, float64])
       [.float64 0x4340000000000000, .float64 0x4340000000000002] "decimal float64 ties go to even (5.3)"
-  , accepts "(5e-324)" (prims [float64]) [.float64 0x0000000000000001]
+  , accepts "(5e-324)" (primitives [float64]) [.float64 0x0000000000000001]
       "a decimal literal rounds to a nonzero float64 subnormal (5.3)" ]
 
 /-- `n * 2^e` written exactly as a decimal literal: for `e < 0` it is `n * 5^-e` scaled
@@ -128,49 +128,49 @@ def exactDecimal (n : Nat) (e : Int) (neg := false) : String :=
 /-- The same boundaries in decimal, at their exact values. -/
 def textDecimalRoundingChecks : List Vector :=
   let pair (a b : String) := s!"({a}, {b})"
-  [ accepts (pair (exactDecimal 1 (-149)) (exactDecimal 1 (-149) (neg := true))) (prims [float32, float32])
+  [ accepts (pair (exactDecimal 1 (-149)) (exactDecimal 1 (-149) (neg := true))) (primitives [float32, float32])
       [.float32 0x00000001, .float32 0x80000001] "the least float32 subnormal, in decimal (5.3)"
-  , accepts (pair (exactDecimal 1 (-150)) (exactDecimal 3 (-150))) (prims [float32, float32])
+  , accepts (pair (exactDecimal 1 (-150)) (exactDecimal 3 (-150))) (primitives [float32, float32])
       [.float32 0x00000000, .float32 0x00000002]
       "float32 ties around the least subnormal, in decimal (5.3)"
   , accepts (pair (exactDecimal (2 ^ 23 - 1) (-149)) (exactDecimal (2 ^ 24 - 1) (-150)))
-      (prims [float32, float32]) [.float32 0x007fffff, .float32 0x00800000]
+      (primitives [float32, float32]) [.float32 0x007fffff, .float32 0x00800000]
       "the greatest float32 subnormal and the carry above it, in decimal (5.3)"
   , accepts (pair (exactDecimal (2 ^ 25 - 1) (-24)) (exactDecimal (2 ^ 25 - 1) 103))
-      (prims [float32, float32]) [.float32 0x40000000, .float32 0x7f800000]
+      (primitives [float32, float32]) [.float32 0x40000000, .float32 0x7f800000]
       "float32 ties that carry into the exponent and past the greatest finite, in decimal (5.3)"
   , accepts (pair (exactDecimal 1 (-1074)) (exactDecimal 1 (-1074) (neg := true)))
-      (prims [float64, float64]) [.float64 0x0000000000000001, .float64 0x8000000000000001]
+      (primitives [float64, float64]) [.float64 0x0000000000000001, .float64 0x8000000000000001]
       "the least float64 subnormal, in decimal (5.3)"
-  , accepts (pair (exactDecimal 1 (-1075)) (exactDecimal 3 (-1075))) (prims [float64, float64])
+  , accepts (pair (exactDecimal 1 (-1075)) (exactDecimal 3 (-1075))) (primitives [float64, float64])
       [.float64 0x0000000000000000, .float64 0x0000000000000002]
       "float64 ties around the least subnormal, in decimal (5.3)"
   , accepts (pair (exactDecimal (2 ^ 52 - 1) (-1074)) (exactDecimal (2 ^ 53 - 1) (-1075)))
-      (prims [float64, float64]) [.float64 0x000fffffffffffff, .float64 0x0010000000000000]
+      (primitives [float64, float64]) [.float64 0x000fffffffffffff, .float64 0x0010000000000000]
       "the greatest float64 subnormal and the carry above it, in decimal (5.3)"
   , accepts (pair (exactDecimal (2 ^ 54 - 1) (-53)) (exactDecimal (2 ^ 54 - 1) 970))
-      (prims [float64, float64]) [.float64 0x4000000000000000, .float64 0x7ff0000000000000]
+      (primitives [float64, float64]) [.float64 0x4000000000000000, .float64 0x7ff0000000000000]
       "float64 ties that carry into the exponent and past the greatest finite, in decimal (5.3)" ]
 
 /-! ## Text (Sections 3.5 and 5.4) -/
 
 def textTextChecks : List Vector :=
-  [ rejects "(\"a\tb\")" (prims [text]) "a raw tab in a text literal (3.5)"
-  , rejects "(\"a\nb\")" (prims [text]) "a raw line feed in a text literal (3.5)"
-  , accepts "(\"\\t\\n\\r\\\\\\\"\\'\")" (prims [text]) [.text "\t\n\r\\\"'"] "the simple escapes (3.5)"
-  , accepts "(\"\u0085\")" (prims [text]) [.text "\u0085"] "a raw C1 control character (3.5)"
-  , accepts "(\"\\e2\\98\\83\")" (prims [text]) [.text "☃"] "byte escapes that make UTF-8 (3.5)"
-  , rejects "(\"\\ff\")" (prims [text]) "byte escapes that do not make UTF-8, as text (5.4)"
+  [ rejects "(\"a\tb\")" (primitives [text]) "a raw tab in a text literal (3.5)"
+  , rejects "(\"a\nb\")" (primitives [text]) "a raw line feed in a text literal (3.5)"
+  , accepts "(\"\\t\\n\\r\\\\\\\"\\'\")" (primitives [text]) [.text "\t\n\r\\\"'"] "the simple escapes (3.5)"
+  , accepts "(\"\u0085\")" (primitives [text]) [.text "\u0085"] "a raw C1 control character (3.5)"
+  , accepts "(\"\\e2\\98\\83\")" (primitives [text]) [.text "☃"] "byte escapes that make UTF-8 (3.5)"
+  , rejects "(\"\\ff\")" (primitives [text]) "byte escapes that do not make UTF-8, as text (5.4)"
   , accepts "(blob \"\\ff\")" (oneOf (.vec nat8)) [.vec [.nat8 0xff]]
       "byte escapes that do not make UTF-8, as a blob (4.2)"
   , accepts "(blob \"é\")" (oneOf (.vec nat8)) [.vec [.nat8 0xc3, .nat8 0xa9]]
       "a blob of a character is its UTF-8 (3.5)"
-  , accepts "(\"\\u{0000000041}\")" (prims [text]) [.text "A"] "leading zeros in a code point (3.5)"
-  , rejects "(\"\\u{d800}\")" (prims [text]) "a surrogate is not a scalar value (3.5)"
-  , rejects "(\"\\u{110000}\")" (prims [text]) "past the last code point (3.5)"
-  , rejects "(\"\\u{}\")" (prims [text]) "an empty code point (3.5)"
-  , rejects "(\"\\u{41_}\")" (prims [text]) "an underscore cannot end a code point (3.5)"
-  , rejects "(\"\\q\")" (prims [text]) "an unknown escape (3.5)" ]
+  , accepts "(\"\\u{0000000041}\")" (primitives [text]) [.text "A"] "leading zeros in a code point (3.5)"
+  , rejects "(\"\\u{d800}\")" (primitives [text]) "a surrogate is not a scalar value (3.5)"
+  , rejects "(\"\\u{110000}\")" (primitives [text]) "past the last code point (3.5)"
+  , rejects "(\"\\u{}\")" (primitives [text]) "an empty code point (3.5)"
+  , rejects "(\"\\u{41_}\")" (primitives [text]) "an underscore cannot end a code point (3.5)"
+  , rejects "(\"\\q\")" (primitives [text]) "an unknown escape (3.5)" ]
 
 /-! ## Constructed values (Sections 4.2, 5.5 and 5.6) -/
 
@@ -184,7 +184,7 @@ def textOptVecChecks : List Vector :=
   , accepts "(vec {})" (oneOf (.vec nat8)) [.vec []] "an empty vector at blob (5.5)"
   , rejects "(blob \"a\")" (oneOf (.vec nat16)) "a blob at a vector of something else (5.5)" ]
 
-def recordAT : TypeSeq := oneOf (recordOf [("a", nat)])
+def recordAT : TypeSequence := oneOf (recordOf [("a", nat)])
 
 def textRecordChecks : List Vector :=
   [ accepts "(record { a = 1; 2 })" (oneOf (.record [(97, nat), (98, nat)]))
@@ -199,10 +199,10 @@ def textRecordChecks : List Vector :=
       [.record [(97, .null), (98, .null), (99, .null)]]
       "a missing field of type opt, null or reserved is null (5.6)"
   , rejects "(record {})" recordAT "a missing field of type nat (5.6)"
-  , rejects "(record { a = 1; 97 = 2 })" (prims [reserved]) "a field id given twice (4.2)"
-  , rejects "(record { 4294967295 = 1; 2 })" (prims [reserved])
+  , rejects "(record { a = 1; 97 = 2 })" (primitives [reserved]) "a field id given twice (4.2)"
+  , rejects "(record { 4294967295 = 1; 2 })" (primitives [reserved])
       "a positional field after the last id (4.2)"
-  , rejects "(record { 4294967296 = 1 })" (prims [reserved]) "a field id past 32 bits (4.2)"
+  , rejects "(record { 4294967296 = 1 })" (primitives [reserved]) "a field id past 32 bits (4.2)"
   , accepts "(record { 0x61 = 1 })" recordAT [.record [(97, .nat 1)]] "a hexadecimal field id (4.2)"
   , accepts "(variant { a })" (oneOf (variantOf [("a", null), ("b", nat)]))
       [.variant 97 .null] "a variant label alone is null (4.2)"
@@ -214,28 +214,28 @@ def textRecordChecks : List Vector :=
 /-! ## Reserved, empty, references, annotations, arguments -/
 
 def textMiscChecks : List Vector :=
-  [ accepts "(vec { 1; -1 })" (prims [reserved]) [.null] "anything is null at reserved (5.2)"
-  , rejects "(null)" (prims [empty]) "nothing elaborates at empty (5.8)"
-  , accepts "(principal \"aaaaa-aa\", principal \"AAAAA-AA\")" (prims [principal, principal])
+  [ accepts "(vec { 1; -1 })" (primitives [reserved]) [.null] "anything is null at reserved (5.2)"
+  , rejects "(null)" (primitives [empty]) "nothing elaborates at empty (5.8)"
+  , accepts "(principal \"aaaaa-aa\", principal \"AAAAA-AA\")" (primitives [principal, principal])
       [.principal [], .principal []] "a principal's text, in either case (Appendix A)"
-  , rejects "(principal \"aaaaaaa\")" (prims [principal]) "a principal's dashes are checked (Appendix A)"
-  , rejects "(principal \"aaaaa-ab\")" (prims [principal]) "a principal's checksum is checked (Appendix A)"
+  , rejects "(principal \"aaaaaaa\")" (primitives [principal]) "a principal's dashes are checked (Appendix A)"
+  , rejects "(principal \"aaaaa-ab\")" (primitives [principal]) "a principal's checksum is checked (Appendix A)"
   , accepts "(principal \"bnkmk-jqaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaa\")"
-      (prims [principal]) [.principal (List.replicate 29 0)] "a principal of 29 bytes (Appendix A)"
+      (primitives [principal]) [.principal (List.replicate 29 0)] "a principal of 29 bytes (Appendix A)"
   , rejects "(principal \"aacd5-niaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa-aaaaa\")"
-      (prims [principal]) "the text of 30 bytes is no principal (Appendix A)"
+      (primitives [principal]) "the text of 30 bytes is no principal (Appendix A)"
   , rejects "(principal \"w7x7r-cok77-xa\")" (oneOf (.service [])) "a principal is not a service (5.7)"
   , accepts "(service \"aaaaa-aa\")" (oneOf (.service [])) [.service []] "a service reference (5.7)"
   , accepts "(func \"aaaaa-aa\".\"mé\")" (oneOf (.func [nat] [] [.query])) [.func [] "mé"]
       "a function reference, its method named by text (5.7)" ]
 
 def textAnnotationChecks : List Vector :=
-  [ accepts "((5 : nat), 6 : nat8)" (prims [nat, nat8]) [.nat 5, .nat8 6]
+  [ accepts "((5 : nat), 6 : nat8)" (primitives [nat, nat8]) [.nat 5, .nat8 6]
       "an annotation at its own type (5.1)"
-  , rejects "((5 : nat))" (prims [int]) "an annotation does not convert (5.1)"
-  , rejects "((1.5 : float64))" (prims [float32]) "an annotation does not narrow (5.1)"
-  , rejects "((1 : nat))" (prims [reserved]) "an annotation at reserved (5.1)"
-  , rejects "((1 : text))" (prims [reserved]) "an annotation that does not hold (5.1)"
+  , rejects "((5 : nat))" (primitives [int]) "an annotation does not convert (5.1)"
+  , rejects "((1.5 : float64))" (primitives [float32]) "an annotation does not narrow (5.1)"
+  , rejects "((1 : nat))" (primitives [reserved]) "an annotation at reserved (5.1)"
+  , rejects "((1 : text))" (primitives [reserved]) "an annotation that does not hold (5.1)"
   , accepts "((record { a = 1; b = 2 } : record { b : nat; a : nat }))"
       (oneOf (recordOf [("a", nat), ("b", nat)])) [.record [(97, .nat 1), (98, .nat 2)]]
       "the same type, its fields in another order (5.1)"
@@ -247,22 +247,22 @@ def textAnnotationChecks : List Vector :=
       "a parameter name that is not UTF-8 in an annotation (5.1)"
   , accepts "((func \"aaaaa-aa\".m : func (x : nat) -> (x : nat)))" (oneOf (.func [nat] [nat] []))
       [.func [] "m"] "a parameter and a result may share a name (5.1)"
-  , rejects "((1 : t))" (prims [nat]) "a type name with no definition (5.1)"
+  , rejects "((1 : t))" (primitives [nat]) "a type name with no definition (5.1)"
   , rejects "(record { a = 1; b = (1 : text) })" recordAT
       "an ignored field must be well-annotated (5.1)" ]
 
-def textArgChecks : List Vector :=
-  [ accepts "(1, 2)" (prims [nat]) [.nat 1] "an argument beyond the types is ignored (5.9)"
-  , accepts "(1,)" (prims [nat]) [.nat 1] "a trailing comma (4.1)"
+def textArgumentChecks : List Vector :=
+  [ accepts "(1, 2)" (primitives [nat]) [.nat 1] "an argument beyond the types is ignored (5.9)"
+  , accepts "(1,)" (primitives [nat]) [.nat 1] "a trailing comma (4.1)"
   , accepts "()" (typesOf do return [← intern (.opt nat), null]) [.null, .null]
       "missing arguments of type opt and null (5.9)"
-  , rejects "()" (prims [nat]) "a missing argument of type nat (5.9)"
-  , rejects "(1, (2 : text))" (prims [nat]) "an ignored argument must be well-annotated (5.9)"
-  , rejects "(1) 2" (prims [nat]) "input after the arguments" ]
+  , rejects "()" (primitives [nat]) "a missing argument of type nat (5.9)"
+  , rejects "(1, (2 : text))" (primitives [nat]) "an ignored argument must be well-annotated (5.9)"
+  , rejects "(1) 2" (primitives [nat]) "input after the arguments" ]
 
 def textChecks : List Vector :=
   textLexChecks ++ textIntChecks ++ textFloatChecks ++ textRoundingChecks ++ textDecimalRoundingChecks ++ textTextChecks ++ textOptVecChecks ++
-  textRecordChecks ++ textMiscChecks ++ textAnnotationChecks ++ textArgChecks
+  textRecordChecks ++ textMiscChecks ++ textAnnotationChecks ++ textArgumentChecks
 
 /-! ## Type equivalence (Section 5.1)
 

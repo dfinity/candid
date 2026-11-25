@@ -8,8 +8,7 @@ would also be the wrong one: it cannot be executed, and it is unlike every
 implementation.
 
 Instead recursion is explicit, through a type table -- which is what the binary
-format calls it (`spec/Candid.md`: "type definition table") and what `candid_types`
-is specified to do with arena indices.
+format calls it (`spec/Candid.md`: "type definition table").
 
 **Nothing here is recursive except the table.** A table entry is a `Composite`; its
 children are `Slot`s; and a `Slot` is a primitive or an index -- never an inline
@@ -40,11 +39,9 @@ syntax is nested, so the parser produces a nested AST and `Candid/Text/Flatten.l
 flattens it into a table; that flattening is also what an encoder does, so it is a
 component this model needs rather than a translation it pays for.
 
-On the name: the implementation in `rust/` calls this a `TypeEnv`, but that `TypeEnv`
-is a `BTreeMap<String, Type>` (`rust/candid/src/types/type_env.rs:7`) -- a *name*-keyed
-environment of `.did` type declarations, which is a different structure from this
-index-keyed table. Both will exist here eventually, so `TypeEnv` is reserved for the
-one where "environment" is the accurate word.
+On the name: a *name*-keyed environment of `.did` type declarations is a different
+structure from this index-keyed table. Both will exist here eventually, so `TypeEnv` is
+reserved for the one where "environment" is the accurate word.
 -/
 
 import Candid.Hash
@@ -56,7 +53,7 @@ abbrev TypeRef := Nat
 
 /-- `<primtype>`, per the grammar at `spec/Candid.md:80` -- which includes
 `principal`. Only `func` and `service` are `<reftype>`s. -/
-inductive Prim where
+inductive Primitive where
   | null | bool | nat | int
   | nat8 | nat16 | nat32 | nat64
   | int8 | int16 | int32 | int64
@@ -66,14 +63,14 @@ inductive Prim where
   deriving DecidableEq, Repr, Inhabited
 
 /-- `<funcann>`. Annotations are part of a function's type, not decoration. -/
-inductive FuncAnnot where
+inductive Annotation where
   | query | oneway | compositeQuery
   deriving DecidableEq, Repr
 
 /-- A mode says how a function is called: an update call if it has none. A function has
 at most one (`lean/Spec/Did.md`, Section 6.3). Every annotation defined so far is a mode;
 one added later need not be. -/
-def FuncAnnot.isMode : FuncAnnot → Bool
+def Annotation.isMode : Annotation → Bool
   | .query | .oneway | .compositeQuery => true
 
 /-- A `<datatype>` in the position where the wire format writes `I`: a primitive, or
@@ -82,7 +79,7 @@ an index into the accompanying `TypeTable`.
 This is a leaf. Composites live in the table and only in the table, so the whole
 type graph is the table -- which is what bounds every recursion over types. -/
 inductive Slot where
-  | prim (p : Prim)
+  | primitive (p : Primitive)
   | ref (target : TypeRef)
   deriving DecidableEq, Repr, Inhabited
 
@@ -94,7 +91,7 @@ inductive Composite where
   | vec (inner : Slot)
   | record (fields : List (FieldId × Slot))
   | variant (alts : List (FieldId × Slot))
-  | func (args rets : List Slot) (annots : List FuncAnnot)
+  | func (parameters results : List Slot) (annotations : List Annotation)
   | service (methods : List (String × Slot))
   /-- A *future type* (`spec/Candid.md`, "Deserialisation of future types"): an opcode
   below `-24`, which this version of Candid does not define, and the bytes that came
@@ -144,7 +141,7 @@ bound that keeps the labels of a function's arguments distinct. -/
 
 /-- Does this slot's reference resolve below `bound`? -/
 def Slot.wellFormed (bound : Nat) : Slot → Bool
-  | .prim _ => true
+  | .primitive _ => true
   | .ref r => r < bound
 
 /-- The slots a composite holds, in no particular order: what has to resolve. -/
@@ -164,7 +161,7 @@ def Composite.labelsOk : Composite → Bool
 /-- No annotation repeats, a function has at most one mode (`lean/Spec/Did.md`,
 Section 6.3), and `spec/Candid.md:211`: "The result list of a `oneway` function must be
 empty." -/
-def Composite.annotsOk : Composite → Bool
+def Composite.annotationsOk : Composite → Bool
   | .func _ rets ann =>
     noDups ann && (ann.filter (·.isMode)).length ≤ 1 && (!ann.contains .oneway || rets.isEmpty)
   | .opt _ | .vec _ | .record _ | .variant _ | .service _ | .future _ _ => true
@@ -180,7 +177,7 @@ def Composite.opcodeOk : Composite → Bool
   | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .service _ => true
 
 def Composite.wellFormed (bound : Nat) (c : Composite) : Bool :=
-  c.labelsOk && c.annotsOk && c.arityOk && c.opcodeOk && c.slots.all (Slot.wellFormed bound)
+  c.labelsOk && c.annotationsOk && c.arityOk && c.opcodeOk && c.slots.all (Slot.wellFormed bound)
 
 /-- `spec/Candid.md:1223`: "The serialised data type representing a method type must
 denote a function type." -/
@@ -190,11 +187,21 @@ def RawTypeTable.methodsDenoteFuncs (t : RawTypeTable) : Composite → Bool
       | .ref r => match t.lookup? r with
         | some (.func _ _ _) => true
         | _ => false
-      | .prim _ => false
+      | .primitive _ => false
   | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .future _ _ => true
 
+/-- One entry of `t` is well formed: alone, and as `methodsDenoteFuncs` looks through
+`t`. -/
+def RawTypeTable.entryWellFormed (t : RawTypeTable) (c : Composite) : Bool :=
+  c.wellFormed t.size && t.methodsDenoteFuncs c
+
 def RawTypeTable.wellFormed (t : RawTypeTable) : Bool :=
-  t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c
+  t.entries.all t.entryWellFormed
+
+/-- The first entry that is not well formed, if any: where a decoder says a table is
+malformed. `none` exactly when the table is well formed. -/
+def RawTypeTable.firstMalformed? (t : RawTypeTable) : Option Nat :=
+  t.entries.toList.findIdx? (!t.entryWellFormed ·)
 
 /-! ## The validated table
 
@@ -226,7 +233,7 @@ def lookup? (t : TypeTable) (r : TypeRef) : Option Composite := t.raw.lookup? r
 /-- Is this slot a type in this table at all? A primitive always is; a reference is
 one exactly when it resolves. -/
 def resolves (t : TypeTable) : Slot → Bool
-  | .prim _ => true
+  | .primitive _ => true
   | .ref r => (t.lookup? r).isSome
 
 /-- A slot known to resolve in `t`: a type, given its table.
@@ -237,9 +244,7 @@ alongside: one table has many roots (a message's arguments, a service's methods)
 a slot of `A` cannot be passed where a slot of `B` is expected. That is what the
 two-table subtype procedure needs most, since the case that matters is a table that
 arrived on the wire against the receiver's own, and mixing them up is invisible when
-both are the same table.
-
-Rust has no dependent types; its counterpart is a view borrowing its table. -/
+both are the same table. -/
 abbrev Root (t : TypeTable) := {s : Slot // t.resolves s = true}
 
 def root? (t : TypeTable) (s : Slot) : Option t.Root :=
@@ -275,24 +280,24 @@ like an AST. -/
 
 namespace Slot
 
-def null : Slot := .prim .null
-def bool : Slot := .prim .bool
-def nat : Slot := .prim .nat
-def int : Slot := .prim .int
-def nat8 : Slot := .prim .nat8
-def nat16 : Slot := .prim .nat16
-def nat32 : Slot := .prim .nat32
-def nat64 : Slot := .prim .nat64
-def int8 : Slot := .prim .int8
-def int16 : Slot := .prim .int16
-def int32 : Slot := .prim .int32
-def int64 : Slot := .prim .int64
-def float32 : Slot := .prim .float32
-def float64 : Slot := .prim .float64
-def text : Slot := .prim .text
-def reserved : Slot := .prim .reserved
-def empty : Slot := .prim .empty
-def principal : Slot := .prim .principal
+def null : Slot := .primitive .null
+def bool : Slot := .primitive .bool
+def nat : Slot := .primitive .nat
+def int : Slot := .primitive .int
+def nat8 : Slot := .primitive .nat8
+def nat16 : Slot := .primitive .nat16
+def nat32 : Slot := .primitive .nat32
+def nat64 : Slot := .primitive .nat64
+def int8 : Slot := .primitive .int8
+def int16 : Slot := .primitive .int16
+def int32 : Slot := .primitive .int32
+def int64 : Slot := .primitive .int64
+def float32 : Slot := .primitive .float32
+def float64 : Slot := .primitive .float64
+def text : Slot := .primitive .text
+def reserved : Slot := .primitive .reserved
+def empty : Slot := .primitive .empty
+def principal : Slot := .primitive .principal
 
 end Slot
 

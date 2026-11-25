@@ -32,7 +32,7 @@ every byte string is accepted or rejected, with one answer.
   table may only contain composite types"); a composite opcode in a slot position, since
   `I` is a primitive or an index; record and variant fields not in strictly ascending id
   order, and methods not in strictly ascending name order -- the spec "assume[s]" both
-  orders and `candid` 0.10 enforces them, so a repeated label is rejected here rather
+  orders, and here they are required, so a repeated label is rejected here rather
   than by well-formedness; a field id that does not fit in 32 bits; an unknown function
   annotation; a method name that is not UTF-8; and then everything
   `RawTypeTable.check` rejects.
@@ -51,17 +51,15 @@ it sits.
 (Appendix A.1):
 
 - **Non-shortest LEB128 is accepted.** The spec says "LEB128" and nothing about
-  redundant continuation bytes; `candid` 0.10 accepts them. Encoding writes the shortest
-  form.
+  redundant continuation bytes. Encoding writes the shortest form.
 - **Opaque references are rejected.** `M(ref(r) : principal) = i8(0)` stands for a
   reference carried outside the byte stream, in `R`, and the spec leaves unspecified how
-  the two are bundled. A `Value` has no reference table to point into, and `candid` 0.10
-  rejects them too ("Opaque reference not supported").
+  the two are bundled. A `Value` has no reference table to point into.
 - **A future value's references are ignored.** A future type is an opcode below `-24`,
   a length and that many bytes; a future value is two lengths, `m` and `n`, then `m`
   bytes, "accompanied by `n` corresponding references in `R`" (`spec/Candid.md`,
   "Deserialisation of future types"). The model has no `R`, as above, and a future
-  value is skipped, so `n` is read and ignored, as `candid` 0.10 does.
+  value is skipped, so `n` is read and ignored.
 
 **Future types.** A decoder that meets one keeps it in the table, as
 `Composite.future`, and decodes its values to `null`: all it can know of one, and the
@@ -127,7 +125,7 @@ decreasing_by
 
 /-! ## Opcodes -/
 
-def Prim.opcode : Prim → Int
+def Primitive.opcode : Primitive → Int
   | .null => -1 | .bool => -2 | .nat => -3 | .int => -4
   | .nat8 => -5 | .nat16 => -6 | .nat32 => -7 | .nat64 => -8
   | .int8 => -9 | .int16 => -10 | .int32 => -11 | .int64 => -12
@@ -135,7 +133,7 @@ def Prim.opcode : Prim → Int
   | .text => -15 | .reserved => -16 | .empty => -17
   | .principal => -24
 
-def Prim.ofOpcode? (op : Int) : Option Prim :=
+def Primitive.ofOpcode? (op : Int) : Option Primitive :=
   match (-op).toNat with
   | 1 => some .null | 2 => some .bool | 3 => some .nat | 4 => some .int
   | 5 => some .nat8 | 6 => some .nat16 | 7 => some .nat32 | 8 => some .nat64
@@ -145,10 +143,10 @@ def Prim.ofOpcode? (op : Int) : Option Prim :=
   | 24 => some .principal
   | _ => none
 
-def FuncAnnot.code : FuncAnnot → UInt8
+def Annotation.code : Annotation → UInt8
   | .query => 1 | .oneway => 2 | .compositeQuery => 3
 
-def FuncAnnot.ofCode? : UInt8 → Option FuncAnnot
+def Annotation.ofCode? : UInt8 → Option Annotation
   | 1 => some .query | 2 => some .oneway | 3 => some .compositeQuery
   | _ => none
 
@@ -164,7 +162,7 @@ def leBytes (k n : Nat) : List UInt8 :=
 
 /-- `I`: a primitive's opcode, or a table index -- signed, like the opcodes. -/
 def Slot.encode : Slot → List UInt8
-  | .prim p => sleb128 p.opcode
+  | .primitive p => sleb128 p.opcode
   | .ref r => sleb128 r
 
 def sortById (fs : List (FieldId × α)) : List (FieldId × α) :=
@@ -195,7 +193,7 @@ def encodeId (id : PrincipalBytes) : List UInt8 := 1 :: leb128 id.length ++ id
 
 def encodeText (s : String) : List UInt8 := leb128 (utf8Bytes s).length ++ utf8Bytes s
 
-def encodePrim : Value → Option (List UInt8)
+def encodePrimitive : Value → Option (List UInt8)
   | .null => some []
   | .bool b => some [if b then 1 else 0]
   | .nat n => some (leb128 n)
@@ -214,7 +212,7 @@ mutual
 /-- `M(v : t)`, for a `v` of type `t` in `T`; `none` if it is not. Recurses on the value,
 as `TypeTable.hasType` does. -/
 def TypeTable.encodeValue (T : TypeTable) : Value → Slot → Option (List UInt8)
-  | v, .prim p => if v.hasPrim p then encodePrim v else none
+  | v, .primitive p => if v.hasPrimitive p then encodePrimitive v else none
   | v, .ref r => match v, T.lookup? r with
     | .null, some (.opt _) => some [0]
     | .opt w, some (.opt t) => ([1] ++ ·) <$> T.encodeValue w t
@@ -267,12 +265,47 @@ A reader is given the input and a position, and returns what it read and where i
 stopped -- with that position's relation to the start, which is what the termination
 argument for values needs. -/
 
-/-- Why a message was rejected, and where. Vectors say only *that* a message is
-rejected; the reason is for people. -/
+/-- Why a message was rejected. A conformance vector says only *that* a message is
+rejected; the kind and the position are for an implementation that reports why and
+where as the model does (`Oracle/Differential.lean`). -/
+inductive Rejection where
+  | endOfInput
+  | missingMagicNumber
+  | notATypeReference
+  | notAType
+  | primitiveInTable
+  | fieldIdTooLarge
+  | fieldsOutOfOrder
+  | methodsOutOfOrder
+  | unknownAnnotation
+  | textNotUtf8
+  | malformedTable
+  | unresolvedArgument
+  | notABool
+  | notAnOptTag
+  | notAReferenceFlag
+  | opaqueReference
+  | principalTooLong
+  | variantIndexOutOfRange
+  | valueOfEmpty
+  | recordWithoutValue
+  | bytesAfterValues
+  /-- More values than the decoder's limit: not a rejection of the message, which may be
+  valid, but of its cost. See "Costly messages". -/
+  | tooManyValues
+  /-- What a checked table and a well-typed reader rule out. -/
+  | unreachable
+  deriving Repr, BEq, DecidableEq
+
+/-- Why a message was rejected, and where: the byte at which the item it rejects starts --
+the byte, the type reference, the list of fields or methods, the table entry. A table
+that is not well formed is rejected at its first malformed entry, an argument type that
+does not resolve at that type. The message is for people. -/
 structure DecodeError where
-  pos : Nat
-  msg : String
-  deriving Repr
+  position : Nat
+  rejection : Rejection
+  message : String
+  deriving Repr, BEq
 
 /-- Read from `pos`, consuming at least one byte. -/
 abbrev Read1 (bs : ByteArray) (pos : Nat) (α : Type) :=
@@ -288,7 +321,7 @@ def Read1.weaken {bs : ByteArray} {pos : Nat} : Read1 bs pos α → Read bs pos 
 
 def readByte (bs : ByteArray) (pos : Nat) : Read1 bs pos UInt8 :=
   if h : pos < bs.size then .ok (bs[pos], ⟨pos + 1, by omega, by omega⟩)
-  else .error ⟨pos, "unexpected end of input"⟩
+  else .error ⟨pos, .endOfInput, "unexpected end of input"⟩
 
 /-- LEB128 from `pos`, which started at `start`. Redundant continuation bytes are
 accepted; see the header. -/
@@ -299,7 +332,7 @@ def readLebFrom (bs : ByteArray) (start pos shift acc : Nat) (hs : start ≤ pos
     let acc := if b % 128 == 0 then acc else acc + b % 128 * 2 ^ shift
     if b < 128 then .ok (acc, ⟨pos + 1, by omega, by omega⟩)
     else readLebFrom bs start (pos + 1) (shift + 7) acc (by omega)
-  else .error ⟨start, "LEB128 runs past the end of the input"⟩
+  else .error ⟨start, .endOfInput, "LEB128 runs past the end of the input"⟩
 termination_by bs.size - pos
 
 def readLeb (bs : ByteArray) (pos : Nat) : Read1 bs pos Nat :=
@@ -316,7 +349,7 @@ def readSlebFrom (bs : ByteArray) (start pos shift acc : Nat) (hs : start ≤ po
       let v : Int := if b < 64 then acc else (acc : Int) - 2 ^ (shift + 7)
       .ok (v, ⟨pos + 1, by omega, by omega⟩)
     else readSlebFrom bs start (pos + 1) (shift + 7) acc (by omega)
-  else .error ⟨start, "SLEB128 runs past the end of the input"⟩
+  else .error ⟨start, .endOfInput, "SLEB128 runs past the end of the input"⟩
 termination_by bs.size - pos
 
 def readSleb (bs : ByteArray) (pos : Nat) : Read1 bs pos Int :=
@@ -327,12 +360,12 @@ def readFixed (bs : ByteArray) (pos k : Nat) (hk : 0 < k) : Read1 bs pos Nat :=
   if h : pos + k ≤ bs.size then
     .ok ((List.range k).foldr (fun i acc => bs[pos + i]!.toNat + 256 * acc) 0,
       ⟨pos + k, by omega, h⟩)
-  else .error ⟨pos, s!"{k} bytes run past the end of the input"⟩
+  else .error ⟨pos, .endOfInput, s!"{k} bytes run past the end of the input"⟩
 
 /-- `len` bytes. -/
 def readBytes (bs : ByteArray) (pos len : Nat) : Read bs pos ByteArray :=
   if h : pos + len ≤ bs.size then .ok (bs.extract pos (pos + len), ⟨pos + len, by omega, h⟩)
-  else .error ⟨pos, s!"{len} bytes run past the end of the input"⟩
+  else .error ⟨pos, .endOfInput, s!"{len} bytes run past the end of the input"⟩
 
 /-- A length, then that many bytes. -/
 def readBlob (bs : ByteArray) (pos : Nat) : Read1 bs pos ByteArray :=
@@ -347,20 +380,26 @@ def readText (bs : ByteArray) (pos : Nat) : Read1 bs pos String :=
   | .error e => .error e
   | .ok (b, p) => match String.fromUTF8? b with
     | some s => .ok (s, p)
-    | none => .error ⟨pos, "text is not UTF-8"⟩
+    | none => .error ⟨pos, .textNotUtf8, "text is not UTF-8"⟩
 
-/-- `M(id(v*))`: flag `1`, then the bytes, at most `maxPrincipalLength` of them. Flag `0`
+/-- `M(id(v*))`: flag `1`, then a length of at most `maxPrincipalLength`, then that many
+bytes. A longer length is rejected before its bytes are read. Flag `0`
 is an opaque reference, which this model does not have; see the header. -/
 def readId (bs : ByteArray) (pos : Nat) : Read1 bs pos PrincipalBytes :=
   match readByte bs pos with
   | .error e => .error e
-  | .ok (1, ⟨p, hp⟩) => match readBlob bs p with
+  | .ok (1, ⟨p, hp⟩) => match readLeb bs p with
     | .error e => .error e
-    | .ok (b, ⟨q, hq⟩) =>
-      if b.size ≤ maxPrincipalLength then .ok (b.toList, ⟨q, by omega, hq.2⟩)
-      else .error ⟨p, s!"a principal of {b.size} bytes, more than {maxPrincipalLength}"⟩
-  | .ok (0, _) => .error ⟨pos, "opaque reference"⟩
-  | .ok (f, _) => .error ⟨pos, s!"reference flag {f}, neither 0 nor 1"⟩
+    | .ok (len, ⟨q, hq⟩) =>
+      -- The length is checked before the bytes are read: a principal that is too long is
+      -- rejected whatever follows its length.
+      if len ≤ maxPrincipalLength then match readBytes bs q len with
+        | .error e => .error e
+        | .ok (b, ⟨r, hr⟩) => .ok (b.toList, ⟨r, by omega, hr.2⟩)
+      else .error ⟨p, .principalTooLong,
+        s!"a principal of {len} bytes, more than {maxPrincipalLength}"⟩
+  | .ok (0, _) => .error ⟨pos, .opaqueReference, "opaque reference"⟩
+  | .ok (f, _) => .error ⟨pos, .notAReferenceFlag, s!"reference flag {f}, neither 0 nor 1"⟩
 
 /-! ## Decoding the header
 
@@ -371,7 +410,12 @@ fails when the bytes run out rather than running long. -/
 /-- A reader over the input, with the position as state. -/
 abbrev Parse := ReaderT ByteArray (StateT Nat (Except DecodeError))
 
-def Parse.fail (msg : String) : Parse α := do throw ⟨← get, msg⟩
+/-- A rejection of the item that starts at `start`. -/
+def Parse.fail (start : Nat) (rejection : Rejection) (msg : String) : Parse α :=
+  throw ⟨start, rejection, msg⟩
+
+/-- Where the next item starts. -/
+def Parse.here : Parse Nat := get
 
 def Parse.lift (r : (bs : ByteArray) → (pos : Nat) → Read1 bs pos α) : Parse α :=
   fun bs pos => match r bs pos with
@@ -399,24 +443,33 @@ where
 /-- `T*`: a count, then that many items. -/
 def Parse.list (p : Parse α) : Parse (List α) := do Parse.times (← Parse.leb) p
 
+/-- `T*`, with where each item starts: so that a check made once all are read can still
+say which one it rejects. -/
+def Parse.listWithOffsets (p : Parse α) : Parse (List (α × Nat)) :=
+  Parse.list do let start ← Parse.here; return (← p, start)
+
 open Parse in
 /-- `I`: a primitive's opcode, or an index into the table. Whether the index resolves
 is `RawTypeTable.check`'s to say. -/
 def Parse.slot : Parse Slot := do
+  let start ← here
   let op ← sleb
   if 0 ≤ op then return .ref op.toNat
-  match Prim.ofOpcode? op with
-  | some p => return .prim p
-  | none => fail s!"opcode {op} where a primitive type or a table index belongs"
+  match Primitive.ofOpcode? op with
+  | some p => return .primitive p
+  | none => fail start .notATypeReference s!"opcode {op} where a primitive type or a table index belongs"
 
 open Parse in
 /-- Fields in strictly ascending id order, which also rules out a repeated one. -/
 def Parse.fields : Parse (List (FieldId × Slot)) := do
+  let start ← here
   let fs ← list do
+    let start ← here
     let id ← leb
-    unless id < UInt32.size do fail s!"field id {id} does not fit in 32 bits"
+    unless id < UInt32.size do fail start .fieldIdTooLarge s!"field id {id} does not fit in 32 bits"
     return (id.toUInt32, ← slot)
-  unless ascending (fs.map (·.1)) do fail "fields not in strictly ascending id order"
+  unless ascending (fs.map (·.1)) do
+    fail start .fieldsOutOfOrder "fields not in strictly ascending id order"
   return fs
 
 /-- Strictly ascending names. -/
@@ -426,6 +479,7 @@ def namesAscending : List String → Bool
 
 open Parse in
 def Parse.entry : Parse Composite := do
+  let start ← here
   let op ← sleb
   match (-op).toNat with
   | 18 => return .opt (← slot)
@@ -436,42 +490,48 @@ def Parse.entry : Parse Composite := do
     let args ← list slot
     let rets ← list slot
     let ann ← list do
+      let start ← here
       let b ← byte
-      match FuncAnnot.ofCode? b with
+      match Annotation.ofCode? b with
       | some a => return a
-      | none => fail s!"unknown function annotation {b}"
+      | none => fail start .unknownAnnotation s!"unknown function annotation {b}"
     return .func args rets ann
   | 23 =>
+    let start ← here
     let ms ← list do
       let name ← Parse.lift readText
       return (name, ← slot)
     unless namesAscending (ms.map (·.1)) do
-      fail "methods not in strictly ascending name order"
+      fail start .methodsOutOfOrder "methods not in strictly ascending name order"
     return .service ms
   | _ =>
-    if (Prim.ofOpcode? op).isSome then fail s!"primitive type {op} in the type table"
+    if (Primitive.ofOpcode? op).isSome then
+      fail start .primitiveInTable s!"primitive type {op} in the type table"
     else if op < -24 then return .future op (← bytes (← leb))
-    else fail s!"opcode {op} is not a type"
+    else fail start .notAType s!"opcode {op} is not a type"
 
 open Parse in
-/-- The magic number, the type table, and the argument types. -/
-def Parse.header : Parse (RawTypeTable × List Slot) := do
+/-- The magic number, the type table, and the argument types, each entry and type with
+where it starts. -/
+def Parse.header : Parse (List (Composite × Nat) × List (Slot × Nat)) := do
   for b in magic do
-    unless (← byte) == b do fail "not a Candid message: the magic number is not DIDL"
-  let entries ← list entry
-  let types ← list slot
-  return ({ entries := entries.toArray }, types)
+    let start ← here
+    unless (← byte) == b do
+      fail start .missingMagicNumber "not a Candid message: the magic number is not DIDL"
+  let entries ← listWithOffsets entry
+  let types ← listWithOffsets slot
+  return (entries, types)
 
 /-! ## Decoding values -/
 
 /-- A primitive value. `null` and `reserved` consume nothing; `empty` has no value. -/
-def decodePrim (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size) : Prim → Read bs pos Value
+def decodePrimitive (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size) : Primitive → Read bs pos Value
   | .null | .reserved => .ok (.null, ⟨pos, Nat.le_refl _, hpos⟩)
-  | .empty => .error ⟨pos, "a value of type empty"⟩
+  | .empty => .error ⟨pos, .valueOfEmpty, "a value of type empty"⟩
   | .bool => match readByte bs pos with
     | .ok (0, p) => .ok (.bool false, ⟨p.1, Nat.le_of_lt p.2.1, p.2.2⟩)
     | .ok (1, p) => .ok (.bool true, ⟨p.1, Nat.le_of_lt p.2.1, p.2.2⟩)
-    | .ok (b, _) => .error ⟨pos, s!"bool {b}, neither 0 nor 1"⟩
+    | .ok (b, _) => .error ⟨pos, .notABool, s!"bool {b}, neither 0 nor 1"⟩
     | .error e => .error e
   | .nat => Read1.weaken ((readLeb bs pos).map fun (n, p) => (.nat n, p))
   | .int => Read1.weaken ((readSleb bs pos).map fun (i, p) => (.int i, p))
@@ -490,7 +550,7 @@ def decodePrim (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size) : Prim → 
 where
   fixed (k : Nat) (f : Nat → Value) : Read bs pos Value :=
     if hk : 0 < k then Read1.weaken ((readFixed bs pos k hk).map fun (n, p) => (f n, p))
-    else .error ⟨pos, "unreachable: a fixed width of zero"⟩
+    else .error ⟨pos, .unreachable, "unreachable: a fixed width of zero"⟩
 
 /-- A function reference: `M(pub(s,n) : func) = i8(1) M(s : service {}) M(n : text)`. -/
 def readFuncRef (bs : ByteArray) (pos : Nat) : Read1 bs pos Value :=
@@ -501,8 +561,8 @@ def readFuncRef (bs : ByteArray) (pos : Nat) : Read1 bs pos Value :=
     | .ok (id, ⟨q, hq⟩) => match readText bs q with
       | .error e => .error e
       | .ok (m, ⟨r, hr⟩) => .ok (.func id m, ⟨r, by omega, hr.2⟩)
-  | .ok (0, _) => .error ⟨pos, "opaque reference"⟩
-  | .ok (f, _) => .error ⟨pos, s!"reference flag {f}, neither 0 nor 1"⟩
+  | .ok (0, _) => .error ⟨pos, .opaqueReference, "opaque reference"⟩
+  | .ok (f, _) => .error ⟨pos, .notAReferenceFlag, s!"reference flag {f}, neither 0 nor 1"⟩
 
 /-- A future value: `m` and `n`, then `m` bytes, skipped. See the header. -/
 def readFuture (bs : ByteArray) (pos : Nat) : Read1 bs pos Value :=
@@ -523,16 +583,16 @@ theorem lex3 {a b c a' b' c' : Nat}
   · exact Prod.Lex.right _ (Prod.Lex.left _ _ h)
   · exact Prod.Lex.right _ (Prod.Lex.right _ h)
 
-/-- Why the decoder stopped at its limit. Not a rejection: the message may be valid. -/
-def exhausted : String := "more values than the decoder's limit"
+/-- Whether the decoder stopped at its limit. Not a rejection of the message, which may
+be valid. -/
+def DecodeError.isExhaustion (e : DecodeError) : Bool := e.rejection == .tooManyValues
 
-def DecodeError.isExhaustion (e : DecodeError) : Bool := e.msg == exhausted
-
-/-- Count one value against `limit`: the count with it, or `exhausted` if that passes the
+/-- Count one value against `limit`: the count with it, or `tooManyValues` if that passes the
 limit. See "Costly messages" in the header. -/
 def charge (pos : Nat) (limit : Option Nat) (used : Nat) :
     Except DecodeError Nat :=
-  if limit.any (· < used + 1) then .error ⟨pos, exhausted⟩ else .ok (used + 1)
+  if limit.any (· < used + 1) then .error ⟨pos, .tooManyValues, "more values than the limit"⟩
+  else .ok (used + 1)
 
 mutual
 
@@ -544,19 +604,19 @@ def decodeValue (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.
   match charge pos limit used with
   | .error e => .error e
   | .ok used => match t with
-  | .prim p => (decodePrim bs pos hpos p).map fun (v, q) => ((v, used), q)
+  | .primitive p => (decodePrimitive bs pos hpos p).map fun (v, q) => ((v, used), q)
   | .ref r => match A.lookup? r with
-    | none => .error ⟨pos, s!"type index {r} does not resolve"⟩
+    | none => .error ⟨pos, .unreachable, s!"type index {r} does not resolve"⟩
     | some (.opt inner) => match readByte bs pos with
       | .error e => .error e
       | .ok (0, ⟨p, hp⟩) => .ok ((.null, used), ⟨p, Nat.le_of_lt hp.1, hp.2⟩)
       | .ok (1, ⟨p, hp⟩) => match decodeValue A bs p hp.2 0 limit used inner with
         | .error e => .error e
         | .ok ((v, used), ⟨q, hq⟩) => .ok ((.opt v, used), ⟨q, by omega, hq.2⟩)
-      | .ok (b, _) => .error ⟨pos, s!"option tag {b}, neither 0 nor 1"⟩
+      | .ok (b, _) => .error ⟨pos, .notAnOptTag, s!"option tag {b}, neither 0 nor 1"⟩
     | some (.vec inner) => match readLeb bs pos with
       | .error e => .error e
-      | .ok (n, ⟨p, hp⟩) => match decodeElems A bs p hp.2 limit used n inner with
+      | .ok (n, ⟨p, hp⟩) => match decodeElements A bs p hp.2 limit used n inner with
         | .error e => .error e
         | .ok ((vs, used), ⟨q, hq⟩) => .ok ((.vec vs, used), ⟨q, by omega, hq.2⟩)
     | some (.record fs) =>
@@ -564,11 +624,13 @@ def decodeValue (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.
         match decodeFields A bs pos hpos (stall + 1) limit used fs with
         | .error e => .error e
         | .ok ((vs, used), q) => .ok ((.record vs, used), q)
-      else .error ⟨pos, "a record type that contains itself at no cost has no value"⟩
+      else .error ⟨pos, .recordWithoutValue,
+        "a record type that contains itself at no cost has no value"⟩
     | some (.variant fs) => match readLeb bs pos with
       | .error e => .error e
       | .ok (i, ⟨p, hp⟩) => match fs[i]? with
-        | none => .error ⟨pos, s!"variant index {i} past the last of {fs.length} alternatives"⟩
+        | none => .error ⟨pos, .variantIndexOutOfRange,
+            s!"variant index {i} past the last of {fs.length} alternatives"⟩
         | some (id, inner) => match decodeValue A bs p hp.2 0 limit used inner with
           | .error e => .error e
           | .ok ((v, used), ⟨q, hq⟩) => .ok ((.variant id v, used), ⟨q, by omega, hq.2⟩)
@@ -601,13 +663,13 @@ decreasing_by
 
 /-- `n` elements of type `t`. None starts where the vector did, since the length came
 first, so each starts with no stall. -/
-def decodeElems (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
+def decodeElements (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
     (limit : Option Nat) (used : Nat) (n : Nat) (t : Slot) : Read bs pos (List Value × Nat) :=
   match n with
   | 0 => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
   | n + 1 => match decodeValue A bs pos hpos 0 limit used t with
     | .error e => .error e
-    | .ok ((v, used), ⟨p, hp⟩) => match decodeElems A bs p hp.2 limit used n t with
+    | .ok ((v, used), ⟨p, hp⟩) => match decodeElements A bs p hp.2 limit used n t with
       | .error e => .error e
       | .ok ((vs, used), ⟨q, hq⟩) => .ok ((v :: vs, used), ⟨q, by omega, hq.2⟩)
 termination_by (bs.size - pos, A.size, n + 1)
@@ -616,16 +678,43 @@ decreasing_by all_goals (apply lex3; omega)
 end
 
 /-- The values of a message, one per argument type. -/
-def decodeArgs (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
+def decodeArguments (A : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ bs.size)
     (limit : Option Nat) (used : Nat) : List Slot → Read bs pos (List Value × Nat)
   | [] => .ok (([], used), ⟨pos, Nat.le_refl _, hpos⟩)
   | t :: ts => match decodeValue A bs pos hpos 0 limit used t with
     | .error e => .error e
-    | .ok ((v, used), ⟨p, hp⟩) => match decodeArgs A bs p hp.2 limit used ts with
+    | .ok ((v, used), ⟨p, hp⟩) => match decodeArguments A bs p hp.2 limit used ts with
       | .error e => .error e
       | .ok ((vs, used), ⟨q, hq⟩) => .ok ((v :: vs, used), ⟨q, by omega, hq.2⟩)
 
 /-! ## Messages -/
+
+/-- A message's header, checked: its table, its argument types, and where its values
+start. -/
+structure CheckedHeader (bs : ByteArray) where
+  table : TypeTable
+  types : List Slot
+  pos : Nat
+  hpos : pos ≤ bs.size
+
+/-- The magic number, the type table and the argument types, read and checked: the table
+well formed, and every argument type resolving in it. -/
+def decodeHeader (bs : ByteArray) : Except DecodeError (CheckedHeader bs) := do
+  let ((entries, types), pos) ← (Parse.header.run bs).run 0
+  let raw : RawTypeTable := { entries := (entries.map (·.1)).toArray }
+  let some table := raw.check
+    | let i := raw.firstMalformed?.getD 0
+      throw ⟨(entries[i]?.map (·.2)).getD pos, .malformedTable,
+        s!"the type table is not well formed at entry {i}"⟩
+  if let some i := types.findIdx? (!table.resolves ·.1) then
+    throw ⟨(types[i]?.map (·.2)).getD pos, .unresolvedArgument,
+      s!"the type of argument {i} does not resolve"⟩
+  if hpos : pos ≤ bs.size then return ⟨table, types.map (·.1), pos, hpos⟩
+  else throw ⟨pos, .unreachable, "unreachable: the header ends past the input"⟩
+
+/-- Nothing after the last value, which ends at `q`. -/
+def finish (bs : ByteArray) (q : Nat) : Except DecodeError Unit :=
+  unless q == bs.size do throw ⟨q, .bytesAfterValues, s!"{bs.size - q} bytes after the last value"⟩
 
 /-- A decoded message: its type table, its argument types, and its values, each of its
 type, and how many values were decoded, counting every value inside another. Nothing has
@@ -637,21 +726,15 @@ structure Message where
   count : Nat
 
 /-- The inverse of `B`: the header, then the values at the header's types, then nothing.
-With a `limit`, decoding stops with `exhausted` as soon as the count passes it; see
+With a `limit`, decoding stops with `tooManyValues` as soon as the count passes it; see
 "Costly messages" in the header. -/
 def decode (bs : ByteArray) (limit : Option Nat := none) : Except DecodeError Message := do
-  let ((raw, types), pos) ← (Parse.header.run bs).run 0
-  let some table := raw.check
-    | throw ⟨pos, "the type table is not well formed"⟩
-  unless types.all table.resolves do
-    throw ⟨pos, "an argument type does not resolve"⟩
-  if hpos : pos ≤ bs.size then
-    match decodeArgs table bs pos hpos limit 0 types with
-    | .error e => throw e
-    | .ok ((values, count), ⟨q, _⟩) =>
-      unless q == bs.size do throw ⟨q, s!"{bs.size - q} bytes after the last value"⟩
-      return { table, types, values, count }
-  else throw ⟨pos, "unreachable: the header ends past the input"⟩
+  let ⟨table, types, pos, hpos⟩ ← decodeHeader bs
+  match decodeArguments table bs pos hpos limit 0 types with
+  | .error e => throw e
+  | .ok ((values, count), ⟨q, _⟩) =>
+    finish bs q
+    return { table, types, values, count }
 
 /-- Deserialisation at the expected types `expected` in `B`, decoding at most `limit`
 values: decode, then coerce the whole argument sequence. `some` is the answer, `none` in
@@ -660,7 +743,7 @@ def deserializeWithin (limit : Nat) (bs : ByteArray) (B : TypeTable)
     (expected : List Slot) : Option (Option (List Value)) :=
   match decode bs (some limit) with
   | .error e => if e.isExhaustion then none else some none
-  | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
+  | .ok m => match (coerceArguments m.table B m.values m.types expected).run with
     | .ok r => some r
     | .error _ => some none
 
@@ -669,7 +752,7 @@ def deserialize (bs : ByteArray) (B : TypeTable) (expected : List Slot) :
     Option (List Value) :=
   match decode bs with
   | .error _ => none
-  | .ok m => match (coerceArgs m.table B m.values m.types expected).run with
+  | .ok m => match (coerceArguments m.table B m.values m.types expected).run with
     | .ok r => r
     | .error _ => none
 

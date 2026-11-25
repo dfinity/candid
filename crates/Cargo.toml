@@ -1,0 +1,33 @@
+# The v1 crates. Their own workspace, not members of the root one: joining that would
+# mean editing the root `Cargo.toml`, which is outside the three directories the rewrite
+# works in (REWRITE.md, Section 5).
+
+[workspace]
+members = ["candid_binary", "candid_types", "candid_value", "conformance_tests"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/dfinity/candid"
+publish = false
+
+[workspace.dependencies]
+candid_types = { path = "candid_types" }
+candid_binary = { path = "candid_binary" }
+candid_value = { path = "candid_value" }
+# Without its default features, which bring serde.
+ic_principal = { version = "0.1.5", default-features = false }
+num-bigint = { version = "0.4", default-features = false, features = ["std"] }
+num-traits = { version = "0.2", default-features = false, features = ["std"] }
+# Dev-only: the conformance tests read the vectors with it. Nothing builds against it.
+serde_json = "1.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = 0 }

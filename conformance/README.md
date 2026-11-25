@@ -8,12 +8,14 @@ a vector too. See [REWRITE.md](../REWRITE.md) for why this exists.
 
 ```
 vectors/                 the suite: JSON, one vector per line
+differential/            exact answers, for an implementation that reports why and where
 runners/candid-0.10/     checks the suite against rust/candid
 tools/test-did/          translates test/*.test.did for the model
 ```
 
 ```
 cd lean && lake exe oracle write ../conformance/vectors        # regenerate
+cd lean && lake exe oracle differential ../conformance/differential/cases.json
 cd lean && lake exe oracle check ../conformance/vectors/*.json # check against the model
 cargo run --release --manifest-path conformance/runners/candid-0.10/Cargo.toml \
     -- conformance/vectors/*.json                              # check against 0.10
@@ -94,7 +96,7 @@ the source: [tools/test-did/](tools/test-did/) translates them into Lean with
 {"version":0,"vectors":[
 {"id":"...","kind":"hash","name":"Ok","expect":17724},
 {"id":"...","kind":"wellformed","type":<type>,"expect":false},
-{"id":"...","kind":"subtype","sub":<type>,"sup":<type>,"expect":true},
+{"id":"...","kind":"subtype","subtype":<type>,"supertype":<type>,"expect":true},
 {"id":"...","kind":"coerce","value":<value>,"from":<type>,"to":<type>,"expect":{"value":<value>}},
 {"id":"...","kind":"coerce","value":<value>,"from":<type>,"to":<type>,"expect":"reject"},
 {"id":"...","kind":"decode","bytes":"4449444c...","types":<types>,"expect":{"values":[<value>, ...]}},
@@ -117,9 +119,9 @@ the format, so it changes in place.
 - **`hash`**: `expect` is the field-id hash of `name`.
 - **`wellformed`**: whether the type is well formed -- every reference resolves, no
   label repeats, a `oneway` function has no results, every method is a function.
-- **`subtype`**: whether `sub <: sup`. Both types are well formed, and each has its
-  own table: `sub`'s references index `sub`'s table, and `sup`'s index `sup`'s. An
-  implementation that takes one environment for both has to merge them.
+- **`subtype`**: whether `subtype <: supertype`. Both types are well formed, and each
+  has its own table: `subtype`'s references index `subtype`'s table, and `supertype`'s
+  index `supertype`'s. An implementation that takes one environment for both has to merge them.
 - **`coerce`**: `value : from ~> v : to`, where `expect` is `{"value": v}`, or
   `"reject"` when no `v` exists and a decoder must fail. Both types are well formed,
   `value` has type `from`, and an expected `v` has type `to`.
@@ -159,7 +161,7 @@ an object with exactly one key, and never a primitive:
 {"vec": <slot>}
 {"record":  [[<field id>, <slot>], ...]}   // ids are u32, in no particular order
 {"variant": [[<field id>, <slot>], ...]}
-{"func": {"args": [<slot>, ...], "rets": [<slot>, ...], "annots": ["query", ...]}}
+{"func": {"parameters": [<slot>, ...], "results": [<slot>, ...], "annotations": ["query", ...]}}
 {"service": [["<method name>", <slot>], ...]}
 {"future": [<opcode>, "<hex>"]}            // a type this version does not define
 ```
@@ -191,6 +193,47 @@ The hex is the principal's bytes, lowercase.
 
 The reference reader rejects unknown keys, kinds and names rather than skip them: once
 the suite is published, the version number is how the format changes.
+
+### Exact answers (optional)
+
+A vector asks only whether a message is rejected, which is all conformance asks. An
+implementation that also reports *why* and *where* -- as the model does -- can be held
+to exactly that, on random messages: `differential/cases.json`, a JSON array, one case
+per line.
+
+```
+{"message": "<hex>", "receiver": <types>, "limit": <n>, "answer": <answer>}
+```
+
+The message is read at the receiver's types, decoding at most `limit` values, counted
+as the `costly` vectors count them (`lean/Candid/Wire.lean`, "Costly messages"). The
+answer is one of:
+
+```
+{"values": [<value>, ...]}                  the values, at the receiver's types
+"failure"                                   an argument does not coerce
+"undefined"                                 an argument is at an infinite option
+{"rejection": "<kind>", "position": <n>}    rejected, at byte n
+```
+
+A rejection is at the first byte of the item it rejects: the byte, the type reference,
+the list of fields or methods, the table entry -- the first malformed one, for a table
+that is not well formed -- the argument type that does not resolve, the value. The
+kinds are the constructors of `Rejection` in `lean/Candid/Wire.lean`:
+`endOfInput`, `missingMagicNumber`, `notATypeReference`, `notAType`,
+`primitiveInTable`, `fieldIdTooLarge`, `fieldsOutOfOrder`, `methodsOutOfOrder`,
+`unknownAnnotation`, `textNotUtf8`, `malformedTable`, `unresolvedArgument`, `notABool`,
+`notAnOptTag`, `notAReferenceFlag`, `opaqueReference`, `principalTooLong`,
+`variantIndexOutOfRange`, `valueOfEmpty`, `recordWithoutValue`, `bytesAfterValues`, and
+`tooManyValues` for a message past the limit. An implementation's own resource limits
+are its own: one may stop a message the model reads on, but not where the model has
+already rejected it. A `malformedTable` counts as found once the whole table is read,
+though its position is the bad entry's.
+
+The cases are random -- types, values, damage to the bytes, variations of the receiver's
+types, limits set to the value -- and come from a seed (`lean/Oracle/Differential.lean`).
+The committed file is from a fixed one, and CI writes it again and fails on a
+difference. `lake exe oracle differential <file> <seed> <count>` writes more.
 
 ### Runners
 
@@ -303,11 +346,13 @@ What the runners have found, recorded so that they outlive the run that found th
   that it accepts a definition of a primitive type's name, which it can then never use,
   and overflows the same positional field id in a type. These are the `did` vectors in
   its known divergences.
-- **0.10's imports differ from the document's in five cases** that existing
+- **0.10's imports differ from the document's in six cases** that existing
   descriptions are unlikely to rely on: it does not normalize `..` in a path, accepts an
   import cycle that avoids the file being read, lets an imported file use the importer's
-  names, merges methods that a plain `import` reaches through an `import service`, and
-  requires a file imported as a service to declare one itself.
+  names, merges methods that a plain `import` reaches through an `import service`,
+  requires a file imported as a service to declare one itself, and never checks the
+  service declaration of a file reached by a plain `import`, so it accepts importing a
+  file that it rejects when that file is read on its own.
 - **0.10 leaves a merged service's methods unsorted.** `resolve_actor` appends imported
   methods after the file's own. Its `equal` compares methods by position, and its
   encoder writes them in the order given, where the binary format requires them

@@ -135,21 +135,21 @@ Whitespace and comments may appear between any two tokens. `label` and `name` ar
 of [TEXT], Section 4.1.
 
 ```abnf
-type       = identifier
-           / "null" / "principal"
-           / "opt" type / "vec" type / "blob"
-           / "record" "{" [field *(";" field) [";"]] "}"
-           / "variant" "{" [alt *(";" alt) [";"]] "}"
-           / "func" functype
-           / "service" methods
+type        = identifier
+            / "null" / "principal"
+            / "opt" type / "vec" type / "blob"
+            / "record" "{" [field *(";" field) [";"]] "}"
+            / "variant" "{" [alternative *(";" alternative) [";"]] "}"
+            / "func" functype
+            / "service" methods
 
-field      = label ":" type / type
-alt        = label ":" type / label
+field       = label ":" type / type
+alternative = label ":" type / label
 
-functype   = params "->" params *annotation
-params     = "(" [param *("," param) [","]] ")"
-param      = name ":" type / type
-annotation = "query" / "composite_query" / "oneway"
+functype    = parameters "->" parameters *annotation
+parameters  = "(" [parameter *("," parameter) [","]] ")"
+parameter   = name ":" type / type
+annotation  = "query" / "composite_query" / "oneway"
 
 methods    = "{" [method *(";" method) [";"]] "}"
 method     = name ":" (functype / identifier)
@@ -203,7 +203,7 @@ labels are hashed and positions numbered, MUST be rejected.
 **Variants.** A variant field written as a `label` alone has type `null`:
 `variant { a }` is `variant{hash("a") : null}`.
 
-**Parameters and results.** A `param` may be named. The name has no meaning, but MUST
+**Parameters and results.** A `parameter` may be named. The name has no meaning, but MUST
 be well-formed UTF-8, and two parameters, or two results, of one function type MUST NOT
 have the same name. A parameter and a result may share a name.
 
@@ -222,7 +222,7 @@ description = [definition *(";" definition) [";"]] [service [";"]]
 definition  = "type" identifier "=" type
             / "import" ["service"] text-literal
 
-service     = "service" [identifier] ":" [params "->"] (methods / identifier)
+service     = "service" [identifier] ":" [parameters "->"] (methods / identifier)
 ```
 
 The definitions, which include imports, come first, separated by semicolons, and the
@@ -290,6 +290,14 @@ Each description MUST also be **self-contained**: every name in it is defined in
 in one of its imports, direct or indirect. A description cannot use a name defined only
 by a description that imports it, so that every description in the graph can be read on
 its own, with the same meaning.
+
+Each of the description's imports, direct or indirect, MUST also be **valid on its
+own**: read as the description being read, with the same files to import from, it is
+not rejected. This holds even where the expansion discards part of it. A plain import
+contributes no methods, but the imported description's service declaration is still
+checked: `import "bad.did"` is rejected if `bad.did` declares
+`service : { m : () -> (nat) oneway }`, and so is an import of a description whose
+constructor takes an argument that is not well-formed.
 
 **Methods.** A description D **provides** methods if it declares a service or imports
 one with `import service`, and the methods it provides, M(D), are:
@@ -523,6 +531,7 @@ from 0.10 is a proposed change to 0.10, or a decision this draft still has to ma
 | `import "mid.did"`, where `mid.did` has `import service "svc.did"` | `svc.did`'s methods join the importer's service | they do not: a plain import contributes no methods |
 | `import service "mid.did"`, where `mid.did` declares no service but has `import service "svc.did"` | rejected: no main service | accepted: `mid.did` provides `svc.did`'s methods |
 | `import "a.did"`, where `a.did` and `b.did` import each other | accepted: each file is read once | rejected: an import cycle ([5.3](#53-imports)) |
+| `import "a.did"`, where `a.did` declares `service : { n : () -> (nat) oneway }` | accepted: the service is discarded unchecked, though `a.did` alone is rejected | rejected: `a.did` is not valid on its own ([5.3](#53-imports)) |
 | `import "sub/../a.did"; import "a.did"` | `a.did` read twice, so its names are defined twice | one description, read once |
 | Two merged methods with different names whose field-id hashes collide | rejected | accepted: method names are not hashed |
 

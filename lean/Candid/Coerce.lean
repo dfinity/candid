@@ -38,8 +38,7 @@ so no enclosing option recovers, nor does anything else, and deserialisation fai
 distinction: it recovers from `none` and passes an exception through. `coerceResult` is what a
 decoder reports for one argument, where the last two both mean a rejected message.
 
-That is the behaviour `candid` has had since 0.10.20 and `test/construct.test.did`
-asserts; the spec said so in #778. The model said `null` here until then.
+`test/construct.test.did` asserts this, and the spec says so since #778.
 
 **Termination.** Every recursive call is on a strictly smaller value, except one: the
 `opt` rule above, which keeps the value and peels the expected type. The model peels
@@ -101,14 +100,14 @@ def optLayers (B : TypeTable) (u : Slot) : Nat → Option (Nat × Slot)
     | .ref r => match B.lookup? r with
       | some (.opt inner) => (optLayers B inner fuel).map fun (n, c) => (n + 1, c)
       | _ => some (0, u)
-    | .prim _ => some (0, u)
+    | .primitive _ => some (0, u)
 
 /-- Is `u` an option type, and of what? -/
 def TypeTable.optOf? (B : TypeTable) : Slot → Option Slot
   | .ref r => match B.lookup? r with
     | some (.opt inner) => some inner
     | _ => none
-  | .prim _ => none
+  | .primitive _ => none
 
 /-- Insert into a list sorted by field id. -/
 def insertField (f : FieldId × α) : List (FieldId × α) → List (FieldId × α)
@@ -150,18 +149,18 @@ reserved`, since `5 : nat ~> null : reserved`. -/
 def coerceAt (A B : TypeTable) (v : Value) (t u : Slot) : Coercion Value :=
   match t, u with
   -- Coercion into `reserved` is the constant map.
-  | _, .prim .reserved => pure .null
+  | _, .primitive .reserved => pure .null
 
   -- On primitive types, coercion is the identity, plus `nat <: int`. `empty` is not
   -- reached, since it has no values.
-  | .prim p, .prim q =>
+  | .primitive p, .primitive q =>
     if p == q then pure v
     else match v, p, q with
       | .nat n, .nat, .int => pure (.int n)
       | _, _, _ => failure
 
   -- A service reference coerces at `principal`, keeping its identity.
-  | .ref i, .prim .principal =>
+  | .ref i, .primitive .principal =>
     match v, A.lookup? i with
     | .service id, some (.service _) => pure (.principal id)
     | _, _ => failure
@@ -246,14 +245,14 @@ end
 coerces it "with the same rules as tuple-like records" (`spec/Candid.md`, "Tuple
 types"), so this is the record rule over positions: an argument past the expected ones
 is ignored, and a missing one is `null` if its expected type accepts `null`. -/
-def coerceArgs (A B : TypeTable) : List Value → List Slot → List Slot → Coercion (List Value)
+def coerceArguments (A B : TypeTable) : List Value → List Slot → List Slot → Coercion (List Value)
   | _, _, [] => pure []
   | v :: vs, t :: ts, u :: us => do
     let w ← coerce A B v t u
-    return w :: (← coerceArgs A B vs ts us)
+    return w :: (← coerceArguments A B vs ts us)
   | _, _, u :: us => do
     unless B.acceptsNull u do failure
-    return .null :: (← coerceArgs A B [] [] us)
+    return .null :: (← coerceArguments A B [] [] us)
 
 /-- What a decoder reports for one value: the coerced value, or `none` for a rejected
 message. With nothing enclosing it, a failed coercion and an undefined one both reject. -/

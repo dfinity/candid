@@ -8,8 +8,8 @@ An expected interface is compared with the model's up to equivalence of types, s
 written in whatever table shape reads best: a recursive type as one entry that refers to
 itself, even where the description spells it as two names.
 
-Where `candid` 0.10 answers differently, the document's Appendix A.2 says why; the
-runner lists those vectors as known divergences.
+Where an implementation is known to answer differently, the document's Appendix A.2
+says so.
 -/
 
 import Oracle.HandwrittenText
@@ -20,7 +20,7 @@ open Candid
 open Candid.Slot
 open Candid.Composite
 
-def expectDid (text : String) (want : Option IfaceFixture) (id : String)
+def expectDid (text : String) (want : Option InterfaceFixture) (id : String)
     (files : List (String × String) := []) : Vector :=
   ⟨s!"did: {id}", .did text files want⟩
 
@@ -71,13 +71,13 @@ def didLexChecks : List Vector :=
 
 /-! ## Types (Section 4) -/
 
-def didPrimChecks : List Vector :=
+def didPrimitiveChecks : List Vector :=
   let names := ["bool", "nat", "int", "nat8", "nat16", "nat32", "nat64", "int8", "int16",
     "int32", "int64", "float32", "float64", "text", "reserved", "empty", "null", "principal"]
-  let prims := [bool, nat, int, nat8, nat16, nat32, nat64, int8, int16, int32, int64,
+  let primitives := [bool, nat, int, nat8, nat16, nat32, nat64, int8, int16, int32, int64,
     float32, float64, text, reserved, empty, null, principal]
   let text := String.join (names.map fun n => s!"type T_{n} = {n}; ")
-  [ defines text (return (names.map ("T_" ++ ·)).zip prims) "every primitive type (4.2)"
+  [ defines text (return (names.map ("T_" ++ ·)).zip primitives) "every primitive type (4.2)"
   , defines "type B = blob;" (return [("B", ← intern (.vec nat8))]) "blob is vec nat8 (4.2)" ]
 
 def didRecordChecks : List Vector :=
@@ -132,7 +132,7 @@ def didServiceTypeChecks : List Vector :=
 
 /-! ## Descriptions (Section 5) -/
 
-def didDescChecks : List Vector :=
+def didDescriptionChecks : List Vector :=
   [ defines "" (return []) "an empty description (5.1)"
   , defines "// only a comment" (return []) "a description of only a comment (5.1)"
   , defines "type A = nat" (return [("A", nat)]) "no semicolon after the last definition (5.1)"
@@ -217,6 +217,15 @@ def didImportChecks : List Vector :=
       "an imported description cannot use a name only its importer defines (5.3)"
       (files := [("a.did", "type A = M;")])
   , rejectsDid "import \"\\ff\";" "an import that is not UTF-8 (5.2)"
+  , rejectsDid "import \"a.did\"; service : { m : () -> () }"
+      "an imported description must be valid on its own, its service declaration too (5.3)"
+      (files := [("a.did", "service : { n : () -> (nat) oneway }")])
+  , rejectsDid "import \"a.did\"; service : { m : () -> () }"
+      "an imported description must be valid on its own, its constructor's arguments too (5.3)"
+      (files := [("a.did", "type N = nat; service : (service { x : N }) -> { n : () -> () }")])
+  , rejectsDid "import \"b.did\";"
+      "an indirect import must be valid on its own too (5.3)"
+      (files := [("b.did", "import \"a.did\";"), ("a.did", "service : { n : () -> (nat) oneway }")])
   , defines "import \"lib/b.did\"; type T = S;" (return [("T", nat), ("B", nat), ("S", nat)])
       "`..` in a path names the importer's parent directory (5.3)"
       (files := [("lib/b.did", "import \"../shared/s.did\"; type B = S;"),
@@ -327,7 +336,7 @@ def didInterfaceChecks : List Vector :=
   , rejectsDid "service : (Missing) -> {}" "a constructor argument that is not defined (6.4)" ]
 
 def didChecks : List Vector :=
-  didLexChecks ++ didPrimChecks ++ didRecordChecks ++ didFuncChecks ++ didServiceTypeChecks ++
-  didDescChecks ++ didImportChecks ++ didNameChecks ++ didWellFormedChecks ++ didInterfaceChecks
+  didLexChecks ++ didPrimitiveChecks ++ didRecordChecks ++ didFuncChecks ++ didServiceTypeChecks ++
+  didDescriptionChecks ++ didImportChecks ++ didNameChecks ++ didWellFormedChecks ++ didInterfaceChecks
 
 end Oracle

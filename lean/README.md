@@ -22,14 +22,16 @@ lake build                                    # build the libraries and the exec
 lake exe oracle                               # check the model against every vector
 lake exe oracle write ../conformance/vectors  # regenerate the committed vectors
 lake exe oracle check <file>...               # check vector files against the model
+lake exe oracle differential <file> [<seed> <count>]  # random messages with exact answers
 ```
 
 Two libraries. `Candid` is the model and imports nothing outside Lean's core.
 `Oracle` is about the model: the vector format and its JSON
 ([Oracle/Vector.lean](Oracle/Vector.lean)), the hand-written vectors
-([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), and the generator
-([Oracle/Generate.lean](Oracle/Generate.lean)). It uses `Lean.Data.Json`, which is why
-it is separate. The format itself is specified in
+([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), the generator
+([Oracle/Generate.lean](Oracle/Generate.lean)), and random messages with exact answers
+([Oracle/Differential.lean](Oracle/Differential.lean)). It uses `Lean.Data.Json`, which
+is why it is separate. The format itself is specified in
 [conformance/README.md](../conformance/README.md#format-version-0).
 
 ## What goes here
@@ -44,7 +46,7 @@ to it, in [Spec/](Spec/), the **specification**.
 1. The type language, `Value`, `subtype`, `coerce`, and the wire format as plain
    Lean functions with `Decidable` instances.
 2. A `lake`-built binary that reads a conformance vector file and reports results.
-3. CI wiring: that binary as a differential oracle against the Rust implementation.
+3. CI wiring: that binary as a differential oracle against an implementation.
 4. *Only then*, proofs about those definitions.
 
 Inverting this produces [coq/MiniCandid.v](../coq/MiniCandid.v) again in a
@@ -113,7 +115,7 @@ to `Ty` would reproduce exactly the defect
 [crates/CLAUDE.md](../crates/CLAUDE.md) anti-pattern 4 names. So "Type" is the family
 prefix and never the whole name: `TypeTable`, `TypeRef`, with `CandidType` left for
 the Rust trait. These identifiers are meant to be **the same in Lean and in Rust**,
-which is what makes "`candid_subtype` reads as a transcription of its Lean
+which is what makes "Rust's subtyping reads as a transcription of its Lean
 counterpart" achievable rather than aspirational.
 
 The two names the flat representation introduced are borrowed from the spec's grammar
@@ -133,7 +135,7 @@ declarations, which is a genuinely different structure from this index-keyed tab
 Both will exist here eventually, so `TypeEnv` stays reserved for the one where
 "environment" is the accurate word. The same names are recorded for the Rust side in
 [crates/README.md](../crates/README.md#naming), because
-[crates/CLAUDE.md](../crates/CLAUDE.md) asks `candid_subtype` to read as a
+[crates/CLAUDE.md](../crates/CLAUDE.md) asks Rust's subtyping to read as a
 transcription of its Lean counterpart, and shared identifiers are most of what makes
 that checkable.
 
@@ -186,7 +188,7 @@ through to the special rule. The failed attempt removes only its own pair from
 `didc check` accepted a breaking upgrade this way, until 0.10.39 (#775) made a failed
 step withdraw every assumption made since it; the vector and the reasoning are in
 [Oracle/Handwritten.lean](Oracle/Handwritten.lean) under "Assumptions made under a
-failed comparison". The same reasoning is the constraint on `candid_subtype`: if it
+failed comparison". The same reasoning is the constraint on Rust's subtyping (`candid_types`): if it
 ever tries a rule and recovers from the failure, it cannot share assumptions across
 that recovery.
 
@@ -262,7 +264,7 @@ reordering.
 **The binary format, as a decoder that is strict and an encoder that is one choice of
 many.** [Candid/Wire.lean](Candid/Wire.lean) has LEB128, `encode`, `decode` -- the
 inverses of the spec's `T` and `M` -- and `deserialize`, which is `decode` followed by
-`coerceArgs`, the spec's "tuple types" rule: an argument sequence coerces like a
+`coerceArguments`, the spec's "tuple types" rule: an argument sequence coerces like a
 tuple-shaped record, so an extra argument is ignored and a missing one is `null` where
 its type accepts `null`. A new vector kind carries bytes, the types to decode them at,
 and the values or `"reject"`.
@@ -350,7 +352,7 @@ checks (`TestDid.parserViolations`). Where the document and 0.10 differ, the run
 the vectors as known divergences, and the document's Appendix B.2 says why. Three of them
 are panics in 0.10.
 
-**Types in annotations are nested and flattened.** `TypeExpr` is the type syntax as
+**Types in annotations are nested and flattened.** `TypeExpression` is the type syntax as
 written, and `flatten` interns it into a table, which is half of the `.did` work below.
 Names are kept in the syntax but resolve in an empty environment, so a name is rejected.
 
@@ -447,6 +449,31 @@ drops, where the document checks every value.
 The other new vectors, on redundant LEB128, a two-byte future opcode and a type
 without values at `reserved`, agree.
 
+## What slice 10 established
+
+**The model as a differential oracle** (item 3 of the ordering rule).
+[Oracle/Differential.lean](Oracle/Differential.lean) writes random messages -- random
+types and values, encoded, often damaged, read at the sender's types, a variation of
+them or unrelated ones, within a limit set to the value -- each with the exact answer
+`decodeAt` gives: the values, failure or undefined coercion, or the rejection and the
+byte it is at. That is an optional part of the conformance format
+([conformance/README.md](../conformance/README.md#exact-answers-optional)), for an
+implementation that reports why and where. Cases from a fixed seed are committed in
+`conformance/differential/` and checked to be up to date. The self-test checks
+`decodeAt_eq` on them too.
+
+**Rejections have kinds.** `DecodeError` carries a `Rejection` beside its message; a
+vector still says only that a message is rejected. To make "the same byte" one answer, a
+header error is at the start of the item it rejects -- the byte, the type reference, the
+list of fields or methods, the entry: a malformed table at its first malformed entry
+(`RawTypeTable.firstMalformed?`), an argument type that does not resolve at that type.
+
+**No implementation is named in the model.** What the model decides, and why, is said
+in its own terms. Where an implementation agrees or differs -- `candid` 0.10 above all --
+is recorded in the appendices of the drafts in [Spec/](Spec/), not in the `.lean`
+files. `Oracle/TestDid.lean` is the exception by its nature: it checks the model's reading
+of `test/*.test.did` against the values `candid_parser` reads there.
+
 ## Constraints
 
 - **No mathlib.** We do not need it, and depending on it would dominate build
@@ -456,6 +483,10 @@ without values at `reserved`, agree.
 - **No `sorry`.** An unproved `theorem` in the build reads as established once it
   scrolls past. Obligations are written as prose next to the definitions they
   constrain, and become `theorem`s when they are proved.
+- **No abbreviations.** Names are complete words, Candid keywords, or proper names,
+  with `Ref` the one exception. The rule, with its exemptions, is in
+  [crates/CLAUDE.md](../crates/CLAUDE.md#4-no-abbreviations-no-config-by-function-name),
+  since `candid_types` and this model share their names.
 
 ## Coverage target
 
@@ -498,6 +529,13 @@ Named here so they are obligations rather than oversights.
   "What slice 3 established"); the theorems are about every value, and soundness is
   the one MiniCandid proves as `coerce_well_defined`. Stated in prose in
   [Candid/Coerce.lean](Candid/Coerce.lean)'s header, not as `sorry`s.
+- **Decoding in one pass is the spec, as a theorem.**
+  [Candid/DecodeAt.lean](Candid/DecodeAt.lean)'s `decodeAt` reads a message at the
+  receiver's types in one pass, as `candid_binary` will, and `decodeAt_eq` says it equals
+  `decode` followed by `coerceArguments`, errors included. The executable checks it on
+  every `decode` and `coerce` vector, and on generated messages where a failed value
+  has more after it to skip (`decodeAtViolations`); stated in the file's header, not as
+  a `sorry`.
 - **Membership is a scan.** `seen` and `seenRev` are lists, so `contains` walks every
   pair recorded so far, and a table of *n* entries in one long cycle costs O(n²):
   measured 234 ms at 10,000 entries and 6.3 s at 50,000. `run` is tail-recursive, so

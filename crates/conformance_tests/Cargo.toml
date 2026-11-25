@@ -1,0 +1,18 @@
+[package]
+name = "conformance_tests"
+version = "0.0.0"
+description = "The conformance vectors, asked of every crate in this workspace"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+candid_binary.workspace = true
+candid_types.workspace = true
+candid_value.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

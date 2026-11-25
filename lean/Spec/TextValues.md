@@ -153,10 +153,10 @@ the keyword `opt` followed by `ional`, and `1e5`, which is one number.
 ### 3.2. Comments
 
 ```abnf
-comment       = line-comment / block-comment
-line-comment  = "//" *line-char
-line-char     = %x00-09 / %x0B-10FFFF
-block-comment = "/*" block-body "*/"
+comment        = line-comment / block-comment
+line-comment   = "//" *line-character
+line-character = %x00-09 / %x0B-10FFFF
+block-comment  = "/*" block-body "*/"
 ```
 
 A `line-comment` extends to the end of the line, not including the line feed.
@@ -220,11 +220,11 @@ and `0.0` remain distinct.
 ### 3.5. Text Literals
 
 ```abnf
-text-literal = DQUOTE *(text-char / escape) DQUOTE
-text-char    = %x20-21 / %x23-5B / %x5D-7E / %x80-10FFFF
-escape       = "\" ( "n" / "r" / "t" / "\" / DQUOTE / "'"
-                   / HEXDIG HEXDIG
-                   / "u{" hex "}" )
+text-literal   = DQUOTE *(text-character / escape) DQUOTE
+text-character = %x20-21 / %x23-5B / %x5D-7E / %x80-10FFFF
+escape         = "\" ( "n" / "r" / "t" / "\" / DQUOTE / "'"
+                     / HEXDIG HEXDIG
+                     / "u{" hex "}" )
 ```
 
 A text literal may not contain a raw C0 control character (U+0000 to U+001F),
@@ -232,11 +232,11 @@ including a line break, or the character U+007F; these are written as escapes. O
 characters, including the C1 controls U+0080 to U+009F, may appear raw, as in [WASM].
 
 The **value of a text literal** is a sequence of bytes, the concatenation of one
-sequence for each `text-char` or `escape` in order:
+sequence for each `text-character` or `escape` in order:
 
 | Written | Bytes |
 |---|---|
-| a `text-char` *c* | `utf8(c)` |
+| a `text-character` *c* | `utf8(c)` |
 | `\n`, `\r`, `\t` | `⟨0x0A⟩`, `⟨0x0D⟩`, `⟨0x09⟩` |
 | `\\`, `\"`, `\'` | `⟨0x5C⟩`, `⟨0x22⟩`, `⟨0x27⟩` |
 | `\` followed by two hexadecimal digits *h* | the single byte *h* |
@@ -259,13 +259,13 @@ The grammar in this section is over the tokens of [Section 3](#3-lexical-structu
 Whitespace and comments may appear between any two tokens.
 
 ```abnf
-args        = "(" [annotated *("," annotated) [","]] ")"
+arguments   = "(" [annotated *("," annotated) [","]] ")"
 
-annotated   = expr [":" type]
+annotated   = expression [":" type]
 
-expr        = "(" annotated ")"
+expression  = "(" annotated ")"
             / number / text-literal / "true" / "false" / "null"
-            / "opt" expr
+            / "opt" expression
             / "vec" "{" [annotated *(";" annotated) [";"]] "}"
             / "blob" text-literal
             / "record" "{" [field *(";" field) [";"]] "}"

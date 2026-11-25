@@ -34,8 +34,8 @@ those paths and broke it. Both bugs fixed in 0.10.34 trace to the same mismatch.
 Use the native `CandidType::try_decode` returning `Result<Option<Self>, _>`. See
 [README.md](README.md#the-serde-divorce).
 
-This is not decode-only. A default build of `candid_types`, `candid_subtype`,
-`candid_wire`, `candid_value` or the facade resolves no `serde` — so no
+This is not decode-only. A default build of `candid_types`, `candid_binary`,
+`candid_value` or the facade resolves no `serde` — so no
 `serde_bytes` and no `#[serde(...)]` attributes, and blobs need a native spelling.
 Reaching for a `Deserialize` bound to make something work is the wrong fix. Two
 things are not violations: an optional, off-by-default feature adding
@@ -45,7 +45,7 @@ shape `ic_principal` already uses), and serde as a config-file deserializer in
 prohibition. See [README.md](README.md#scope-serde-leaves-the-data-path-entirely).
 
 A foreign type that needs a Candid representation gets a `#[candid(with = "...")]`
-adapter, never a serde bridge — a bridge cannot supply `ty()`, and the reasoning is
+adapter, never a serde bridge — a bridge cannot supply `intern_type`, and the reasoning is
 recorded in
 [README.md](README.md#foreign-types-get-an-adapter-not-a-serde-bridge) so it does
 not get relitigated.
@@ -101,6 +101,22 @@ decode_one_with_skipping_quota, decode_one_with_decoding_and_skipping_quota,
 Write names out. Options go in a config struct or a builder, never into the
 function name.
 
+Precisely, every word in a name is one of:
+
+- **a complete word**: `Primitive`, `Annotation`, `parameters`, `Description`;
+- **a Candid keyword, naming the construct it is the keyword for**: `opt`, `vec`,
+  `func`, `nat8`, `record`, `query`, `composite_query`. `Composite::Func` is `func`,
+  as `Composite::Opt` is `opt`; spelling either out would put a translation between
+  the code and the language it implements, and `Opt` would become Rust's `Option`;
+- **a proper name or acronym**: LEB128, UTF-8, IEEE's `emin`/`emax`, and `did` for
+  the description file format;
+- **`Ref`**, the one accepted abbreviation: `TypeRef` and `Slot::Ref`.
+
+Local variables are exempt, and so are Lean's proof-naming conventions (`_refl`,
+`_iff`, `dec…`, `…Aux`). The rule covers [`lean/`](../lean/), the conformance format,
+and the grammar in [`lean/Spec/`](../lean/Spec/), since those names are shared with
+these crates.
+
 The core type names are already settled, and are shared with [`lean/`](../lean/) so the
 two read alike — see [README.md](README.md#naming). In particular `TypeTable` is the
 index-keyed table — the checked one, with `RawTypeTable` for what a decoder or builder
@@ -108,7 +124,7 @@ produces before checking — and `TypeEnv` is reserved for the name-keyed `.did`
 environment; do not reuse `TypeEnv` for the former, which is the mistake `rust/`
 makes.
 
-### 5. No `unsafe` in `candid_subtype` or `candid_wire`
+### 5. No `unsafe` in `candid_types` or `candid_binary`
 
 These two crates are the verification target. No `unsafe`, no interior
 mutability, no trait-object indirection in core paths. This is a hard constraint,
@@ -127,15 +143,19 @@ with the general path, and it must be covered by the same conformance vectors.
 
 - **The Lean model in [`lean/`](../lean/) is the specification.** Where Rust and
   Lean disagree, that is a bug in one of them and it gets investigated, not
-  papered over. `candid_subtype` in particular should read as a transcription of
-  its Lean counterpart.
+  papered over. Subtyping in particular (the `subtype` module of `candid_types`)
+  should read as a transcription of its Lean counterpart.
 - **Every behaviour is a conformance vector.** New behaviour lands with vectors in
   [`conformance/`](../conformance/), not just Rust unit tests — the vectors are
   what other implementations consume.
-- **`candid_wire` stands alone.** It must be usable with no derive macro and no
+- **`candid_binary` stands alone.** It must be usable with no derive macro and no
   serde. If you need `candid_value` or the facade to make it work, the layering is
   wrong.
-- **Untrusted input.** Everything in `candid_wire` parses bytes from the network.
+- **Coercion is decoding.** It lives in `candid_binary`'s decoder and nowhere else:
+  no value-to-value `coerce`, which would be a second implementation of it. See
+  [README.md](README.md#why-these-seams).
+- **Untrusted input.** Everything in `candid_binary` parses bytes from the network,
+  and so may anything in `candid_types` that a decoded table reaches.
   Bounded allocation, explicit cost accounting, no unbounded recursion.
 
 ## Status

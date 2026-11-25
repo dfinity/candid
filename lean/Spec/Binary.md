@@ -295,7 +295,9 @@ A principal, and the principal of a service reference, is the byte `01`, then a 
 its bytes. A function reference is the byte `01`, then its principal written as above,
 then its method name as text.
 
-A decoder MUST reject a principal of more than 29 bytes ([TYPES], Section 3.1). It MUST
+A decoder MUST reject a principal of more than 29 bytes ([TYPES], Section 3.1), and
+does so by its length, before reading its bytes: a principal that claims more is
+rejected whatever follows. It MUST
 reject any first byte other than `01`: the byte `00` stands, in [CANDID], for a
 reference carried outside the message, which this version does not have.
 
@@ -481,7 +483,7 @@ it differs from `candid` 0.10, the Rust implementation.
   sequence of references, and a reference value either as a principal or as `00`, an
   index into that sequence. No platform carries the sequence, and 0.10 rejects `00`
   ("Opaque reference not supported"). Here a message is its bytes, `00` is rejected,
-  and the reference count of a future value is ignored.
+  and the reference count of a future value is ignored, as 0.10 ignores it.
 - **Order of members.** [CANDID] "assumes" that fields are in ascending order of id and
   methods in ascending order of name. Here the order is required, strictly, so a
   decoder rejects a repeated field or method. 0.10 agrees.

@@ -40,12 +40,12 @@ def Fixture.check? (f : Fixture) : Option ((t : TypeTable) × t.Root) := do
   return ⟨t, r⟩
 
 /-- A sequence of types sharing one table: what a message is decoded at. -/
-structure TypeSeq where
+structure TypeSequence where
   table : RawTypeTable
   roots : List Slot
 
 /-- Check the table, then every root. -/
-def TypeSeq.check? (s : TypeSeq) : Option ((t : TypeTable) × List t.Root) := do
+def TypeSequence.check? (s : TypeSequence) : Option ((t : TypeTable) × List t.Root) := do
   let t ← s.table.check
   let rs ← s.roots.mapM t.root?
   return ⟨t, rs⟩
@@ -53,7 +53,7 @@ def TypeSeq.check? (s : TypeSeq) : Option ((t : TypeTable) × List t.Root) := do
 /-- An interface as written down (`lean/Spec/Did.md`, Section 6.4): a table that has not
 been checked yet, each defined name's type, and the service declaration, if any, with
 its initialization arguments if it is a constructor. -/
-structure IfaceFixture where
+structure InterfaceFixture where
   table : RawTypeTable
   types : List (String × Slot)
   service : Option (Option (List Slot) × Slot)
@@ -70,18 +70,18 @@ inductive Assertion where
   | coerce (value : Value) (src dst : Fixture) (want : Option Value)
   /-- `bytes`, deserialised at `types`, are the values `want`, one per type, or are
   rejected when `want` is `none`. -/
-  | decode (bytes : ByteArray) (types : TypeSeq) (want : Option (List Value))
+  | decode (bytes : ByteArray) (types : TypeSequence) (want : Option (List Value))
   /-- `bytes`, deserialised at `types`, cost more than the model will spend
   (`costlyLimit`), so it gives no answer. An implementation may reject them for lack of
   resources, or decode them; it must not crash. -/
-  | decodeCostly (bytes : ByteArray) (types : TypeSeq)
+  | decodeCostly (bytes : ByteArray) (types : TypeSequence)
   /-- `text`, read as an argument sequence at `types` (`lean/Spec/TextValues.md`), is
   the values `want`, one per type, or is rejected when `want` is `none`. -/
-  | parse (text : String) (types : TypeSeq) (want : Option (List Value))
+  | parse (text : String) (types : TypeSequence) (want : Option (List Value))
   /-- `text`, read as a description (`lean/Spec/Did.md`) at `main.did`, with `files` the
   descriptions it can import, by location, means the interface `want`, up to
   equivalence of types, or is rejected when `want` is `none`. -/
-  | did (text : String) (files : List (String × String)) (want : Option IfaceFixture)
+  | did (text : String) (files : List (String × String)) (want : Option InterfaceFixture)
 
 structure Vector where
   /-- Unique within the suite. Human-readable, and stable: a runner's list of known
@@ -93,7 +93,7 @@ structure Vector where
 
 The spelling of each primitive and annotation is the `.did` keyword for it. -/
 
-def _root_.Candid.Prim.name : Prim → String
+def _root_.Candid.Primitive.name : Primitive → String
   | .null => "null" | .bool => "bool" | .nat => "nat" | .int => "int"
   | .nat8 => "nat8" | .nat16 => "nat16" | .nat32 => "nat32" | .nat64 => "nat64"
   | .int8 => "int8" | .int16 => "int16" | .int32 => "int32" | .int64 => "int64"
@@ -101,17 +101,17 @@ def _root_.Candid.Prim.name : Prim → String
   | .text => "text" | .reserved => "reserved" | .empty => "empty"
   | .principal => "principal"
 
-def _root_.Candid.Prim.all : List Prim :=
+def _root_.Candid.Primitive.all : List Primitive :=
   [ .null, .bool, .nat, .int, .nat8, .nat16, .nat32, .nat64
   , .int8, .int16, .int32, .int64, .float32, .float64
   , .text, .reserved, .empty, .principal ]
 
-def _root_.Candid.Prim.ofName? (s : String) : Option Prim := Prim.all.find? (·.name == s)
+def _root_.Candid.Primitive.ofName? (s : String) : Option Primitive := Primitive.all.find? (·.name == s)
 
-def _root_.Candid.FuncAnnot.name : FuncAnnot → String
+def _root_.Candid.Annotation.name : Annotation → String
   | .query => "query" | .oneway => "oneway" | .compositeQuery => "composite_query"
 
-def _root_.Candid.FuncAnnot.ofName? : String → Option FuncAnnot
+def _root_.Candid.Annotation.ofName? : String → Option Annotation
   | "query" => some .query
   | "oneway" => some .oneway
   | "composite_query" => some .compositeQuery
@@ -131,7 +131,7 @@ def bytesToHex (bs : PrincipalBytes) : String := String.join (bs.map (hexFixed 2
 
 /-- A primitive is its name; a reference is its table index. -/
 def _root_.Candid.Slot.toJson : Slot → Json
-  | .prim p => .str p.name
+  | .primitive p => .str p.name
   | .ref r => .num r
 
 def labelledToJson (fs : List (FieldId × Slot)) : Json :=
@@ -145,8 +145,8 @@ def _root_.Candid.Composite.toJson : Composite → Json
   | .record fs => .mkObj [("record", labelledToJson fs)]
   | .variant fs => .mkObj [("variant", labelledToJson fs)]
   | .func args rets ann => .mkObj [("func", .mkObj
-      [ ("args", slotsToJson args), ("rets", slotsToJson rets)
-      , ("annots", .arr (ann.map (Json.str ·.name)).toArray) ])]
+      [ ("parameters", slotsToJson args), ("results", slotsToJson rets)
+      , ("annotations", .arr (ann.map (Json.str ·.name)).toArray) ])]
   | .service ms => .mkObj [("service",
       .arr (ms.map fun (n, s) => Json.arr #[.str n, s.toJson]).toArray)]
   | .future op d => .mkObj [("future", .arr #[.num op, .str (bytesToHex d)])]
@@ -154,7 +154,7 @@ def _root_.Candid.Composite.toJson : Composite → Json
 def Fixture.toJson (f : Fixture) : Json :=
   .mkObj [("table", .arr (f.table.entries.map Composite.toJson)), ("root", f.root.toJson)]
 
-def TypeSeq.toJson (s : TypeSeq) : Json :=
+def TypeSequence.toJson (s : TypeSequence) : Json :=
   .mkObj [("table", .arr (s.table.entries.map Composite.toJson)),
     ("roots", .arr (s.roots.map Slot.toJson).toArray)]
 
@@ -197,7 +197,7 @@ def expectValuesToJson : Option (List Value) → Json
   | some vs => .mkObj [("values", .arr (vs.map valueToJson).toArray)]
   | none => .str "reject"
 
-def IfaceFixture.toJson (i : IfaceFixture) : Json :=
+def InterfaceFixture.toJson (i : InterfaceFixture) : Json :=
   .mkObj [("table", .arr (i.table.entries.map Composite.toJson)),
     ("types", .arr (i.types.map fun (n, s) => Json.arr #[.str n, s.toJson]).toArray),
     ("service", match i.service with
@@ -207,7 +207,7 @@ def IfaceFixture.toJson (i : IfaceFixture) : Json :=
           | some ts => slotsToJson ts), ("type", s.toJson)])]
 
 /-- An expected interface, or `"reject"`. -/
-def expectIfaceToJson : Option IfaceFixture → Json
+def expectInterfaceToJson : Option InterfaceFixture → Json
   | some i => .mkObj [("interface", i.toJson)]
   | none => .str "reject"
 
@@ -224,7 +224,7 @@ def Vector.render (v : Vector) : String :=
   | .wellFormed t want =>
     head "wellformed" ++ field "type" t.toJson ++ field "expect" (.bool want) ++ "}"
   | .subtype a b want =>
-    head "subtype" ++ field "sub" a.toJson ++ field "sup" b.toJson ++
+    head "subtype" ++ field "subtype" a.toJson ++ field "supertype" b.toJson ++
       field "expect" (.bool want) ++ "}"
   | .coerce v a b want =>
     head "coerce" ++ field "value" (valueToJson v) ++ field "from" a.toJson ++
@@ -242,7 +242,7 @@ def Vector.render (v : Vector) : String :=
     let filesField := if files.isEmpty then "" else
       field "files" (.arr (files.map fun (l, t) => Json.arr #[.str l, .str t]).toArray)
     head "did" ++ field "text" (.str text) ++ filesField ++
-      field "expect" (expectIfaceToJson want) ++ "}"
+      field "expect" (expectInterfaceToJson want) ++ "}"
 
 /-- A whole file: one vector per line, so that a change to the model shows up in a diff
 as exactly the vectors whose answers it changed. -/
@@ -266,8 +266,8 @@ def expectKeys (j : Json) (keys : List String) : Except String Unit := do
     throw s!"expected keys {keys}, got {got}"
 
 def _root_.Candid.Slot.fromJson? : Json → Except String Slot
-  | .str s => match Prim.ofName? s with
-    | some p => return .prim p
+  | .str s => match Primitive.ofName? s with
+    | some p => return .primitive p
     | none => throw s!"unknown primitive type {repr s}"
   | j => do return .ref (← j.getNat?)
 
@@ -312,14 +312,14 @@ def _root_.Candid.Composite.fromJson? (j : Json) : Except String Composite := do
   | [("record", fs)] => return .record (← labelledFromJson? fs)
   | [("variant", fs)] => return .variant (← labelledFromJson? fs)
   | [("func", f)] =>
-    expectKeys f ["args", "rets", "annots"]
-    let ann ← (← (← f.getObjVal? "annots").getArr?).toList.mapM fun a => do
+    expectKeys f ["parameters", "results", "annotations"]
+    let ann ← (← (← f.getObjVal? "annotations").getArr?).toList.mapM fun a => do
       let s ← a.getStr?
-      match FuncAnnot.ofName? s with
+      match Annotation.ofName? s with
       | some a => pure a
       | none => throw s!"unknown function annotation {repr s}"
-    return .func (← slotsFromJson? (← f.getObjVal? "args"))
-      (← slotsFromJson? (← f.getObjVal? "rets")) ann
+    return .func (← slotsFromJson? (← f.getObjVal? "parameters"))
+      (← slotsFromJson? (← f.getObjVal? "results")) ann
   | [("service", ms)] =>
     return .service (← (← ms.getArr?).toList.mapM (pairFromJson? Json.getStr?))
   | [("future", f)] =>
@@ -411,7 +411,7 @@ def expectValuesFromJson? : Json → Except String (Option (List Value))
     expectKeys j ["values"]
     return some (← (← (← j.getObjVal? "values").getArr?).toList.mapM valueFromJson?)
 
-def TypeSeq.fromJson? (j : Json) : Except String TypeSeq := do
+def TypeSequence.fromJson? (j : Json) : Except String TypeSequence := do
   expectKeys j ["table", "roots"]
   let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
   return { table := { entries }, roots := ← slotsFromJson? (← j.getObjVal? "roots") }
@@ -421,7 +421,7 @@ def Fixture.fromJson? (j : Json) : Except String Fixture := do
   let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
   return { table := { entries }, root := ← Slot.fromJson? (← j.getObjVal? "root") }
 
-def IfaceFixture.fromJson? (j : Json) : Except String IfaceFixture := do
+def InterfaceFixture.fromJson? (j : Json) : Except String InterfaceFixture := do
   expectKeys j ["table", "types", "service"]
   let entries ← (← (← j.getObjVal? "table").getArr?).mapM Composite.fromJson?
   let types ← (← (← j.getObjVal? "types").getArr?).toList.mapM fun t => do
@@ -438,11 +438,11 @@ def IfaceFixture.fromJson? (j : Json) : Except String IfaceFixture := do
       pure (some (init, ← Slot.fromJson? (← sj.getObjVal? "type")))
   return { table := { entries }, types, service }
 
-def expectIfaceFromJson? : Json → Except String (Option IfaceFixture)
+def expectInterfaceFromJson? : Json → Except String (Option InterfaceFixture)
   | .str "reject" => return none
   | j => do
     expectKeys j ["interface"]
-    return some (← IfaceFixture.fromJson? (← j.getObjVal? "interface"))
+    return some (← InterfaceFixture.fromJson? (← j.getObjVal? "interface"))
 
 def Vector.fromJson? (j : Json) : Except String Vector := do
   let id ← (← j.getObjVal? "id").getStr?
@@ -456,9 +456,9 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
       return .wellFormed (← Fixture.fromJson? (← j.getObjVal? "type"))
         (← (← j.getObjVal? "expect").getBool?)
     | "subtype" =>
-      expectKeys j ["id", "kind", "sub", "sup", "expect"]
-      return .subtype (← Fixture.fromJson? (← j.getObjVal? "sub"))
-        (← Fixture.fromJson? (← j.getObjVal? "sup")) (← (← j.getObjVal? "expect").getBool?)
+      expectKeys j ["id", "kind", "subtype", "supertype", "expect"]
+      return .subtype (← Fixture.fromJson? (← j.getObjVal? "subtype"))
+        (← Fixture.fromJson? (← j.getObjVal? "supertype")) (← (← j.getObjVal? "expect").getBool?)
     | "coerce" =>
       expectKeys j ["id", "kind", "value", "from", "to", "expect"]
       return .coerce (← valueFromJson? (← j.getObjVal? "value"))
@@ -467,14 +467,14 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
     | "decode" =>
       expectKeys j ["id", "kind", "bytes", "types", "expect"]
       let bs : ByteArray := ⟨(← bytesFromHex? (← j.getObjVal? "bytes")).toArray⟩
-      let ts ← TypeSeq.fromJson? (← j.getObjVal? "types")
+      let ts ← TypeSequence.fromJson? (← j.getObjVal? "types")
       let expect ← j.getObjVal? "expect"
       if expect == .str "costly" then return .decodeCostly bs ts
       return .decode bs ts (← expectValuesFromJson? expect)
     | "parse" =>
       expectKeys j ["id", "kind", "text", "types", "expect"]
       return .parse (← (← j.getObjVal? "text").getStr?)
-        (← TypeSeq.fromJson? (← j.getObjVal? "types"))
+        (← TypeSequence.fromJson? (← j.getObjVal? "types"))
         (← expectValuesFromJson? (← j.getObjVal? "expect"))
     | "did" =>
       let files ← match j.getObjVal? "files" with
@@ -490,7 +490,7 @@ def Vector.fromJson? (j : Json) : Except String Vector := do
           if files.isEmpty then throw "`files` is omitted when there are none"
           pure files
       return .did (← (← j.getObjVal? "text").getStr?) files
-        (← expectIfaceFromJson? (← j.getObjVal? "expect"))
+        (← expectInterfaceFromJson? (← j.getObjVal? "expect"))
     | k => throw s!"unknown vector kind {repr k}" : Except String Assertion)
   return { id, assertion }
 
@@ -523,7 +523,7 @@ def equivSlots (A B : TypeTable) (a b : Slot) : Bool :=
 
 /-- Where an interface the model read differs from the expected one, up to equivalence:
 `none` if they agree. -/
-def ifaceDifference (got : Did.Interface) (W : TypeTable) (want : IfaceFixture) :
+def interfaceDifference (got : Did.Interface) (W : TypeTable) (want : InterfaceFixture) :
     Option String :=
   let G := got.table
   let names (ts : List (String × Slot)) := ts.map (·.1)
@@ -587,12 +587,12 @@ def Assertion.disagreement : Assertion → Option String
       let roots := us.map (·.1)
       if !oneOfEach B roots want then some "the expected values are not one of each type"
       else
-        let got := Text.readArgs text B roots
+        let got := Text.readArguments text B roots
         if got == want then none
         else some s!"got {(expectValuesToJson got).compress}, want {(expectValuesToJson want).compress}"
     | none => some "a type is malformed, so reading text at it is not defined"
   | .did text files want =>
-    let got := Did.readDescIn files text
+    let got := Did.readDescriptionIn files text
     match got, want with
     | none, none => none
     | some _, none => some "accepted, want reject"
@@ -600,7 +600,7 @@ def Assertion.disagreement : Assertion → Option String
     | some g, some w =>
       match w.table.check with
       | none => some "the expected interface's table is malformed"
-      | some W => ifaceDifference g W w
+      | some W => interfaceDifference g W w
   | .decodeCostly bs ts =>
     match ts.check? with
     | some ⟨B, us⟩ =>
@@ -618,6 +618,61 @@ def Assertion.withinDisagreement : Assertion → Option String
       | some got => if got == want then none
         else some s!"within the limit, got {(expectValuesToJson got).compress}"
       | none => some "the model runs out within its limit"
+  | _ => none
+
+/-! ## One pass
+
+`decodeAt` (`Candid/DecodeAt.lean`) reads a message at the receiver's types in one pass,
+and is claimed to give exactly the answer of `decode` followed by `coerceArguments`:
+the same values, the same failure, the same error at the same byte. The claim,
+`decodeAt_eq`, is checked here rather than proved. -/
+
+/-- `decode` then `coerceArguments`: what `decodeAt` must equal. -/
+def decodeThenCoerce (bs : ByteArray) (B : TypeTable) (us : List Slot) (limit : Option Nat) :
+    Except DecodeError (Outcome (List Value)) := do
+  let m ← decode bs limit
+  pure (coerceArguments m.table B m.values m.types us).run
+
+def sameAnswer : Except DecodeError (Outcome (List Value)) →
+    Except DecodeError (Outcome (List Value)) → Bool
+  | .error e, .error f => e == f
+  | .ok (.ok a), .ok (.ok b) => a == b
+  | .ok (.error a), .ok (.error b) => a == b
+  | _, _ => false
+
+def describeAnswer : Except DecodeError (Outcome (List Value)) → String
+  | .error e => s!"error at byte {e.position}: {e.message}"
+  | .ok (.ok (some vs)) => (expectValuesToJson (some vs)).compress
+  | .ok (.ok none) => "failure"
+  | .ok (.error _) => "undefined"
+
+/-- Where `decodeAt` and `decodeThenCoerce` differ, at any of these limits. -/
+def onePassDisagreement (bs : ByteArray) (B : TypeTable) (us : List Slot)
+    (limits : List (Option Nat)) : Option String :=
+  limits.findSome? fun limit =>
+    let got := decodeAt bs B us limit
+    let want := decodeThenCoerce bs B us limit
+    if sameAnswer got want then none
+    else some s!"decodeAt (limit {limit}) gives {describeAnswer got}, decode then coerce {describeAnswer want}"
+
+/-- `decodeAt_eq` on the bytes of a vector: every `decode` vector, within the oracle's
+limit and without one; every `costly` one within the limit; and every `coerce` vector as
+encode-then-decode, which must also give the vector's answer. -/
+def Assertion.decodeAtDisagreement : Assertion → Option String
+  | .decode bs ts _ => ts.check?.bind fun ⟨B, us⟩ =>
+    onePassDisagreement bs B (us.map (·.1)) [none, some costlyLimit]
+  | .decodeCostly bs ts => ts.check?.bind fun ⟨B, us⟩ =>
+    onePassDisagreement bs B (us.map (·.1)) [some costlyLimit]
+  | .coerce v a b want => match a.check?, b.check? with
+    | some ⟨A, a⟩, some ⟨B, b⟩ => match encode A [a.1] [v] with
+      | none => some "the value does not encode at the type it is coerced from"
+      | some bs => (onePassDisagreement bs B [b.1] [none]).orElse fun _ =>
+        let got := match decodeAt bs B [b.1] with
+          | .ok (.ok (some [w])) => some w
+          | _ => none
+        if got == want then none
+        else some s!"encoded and decoded in one pass, got {(expectToJson got).compress}"
+    | _, _ => none
   | _ => none
 
 end Oracle

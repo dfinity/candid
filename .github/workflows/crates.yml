@@ -1,0 +1,67 @@
+name: Crates
+
+# Builds and tests the v1 crates under `crates/`, their own workspace. Their tests read
+# `conformance/vectors/` and `conformance/differential/`, so a change there triggers this
+# too.
+#
+# Rides the `rewrite` branch under the carve-out in REWRITE.md, Section 5: it gates
+# only the new directories, so it cannot affect any check that runs on `master` today.
+
+on:
+  push:
+    branches:
+      - master
+      - rewrite
+    paths:
+      - 'crates/**'
+      - 'conformance/vectors/**'
+      - 'conformance/differential/**'
+      - '.github/workflows/crates.yml'
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'conformance/vectors/**'
+      - 'conformance/differential/**'
+      - '.github/workflows/crates.yml'
+
+# Not a required status check. If it becomes one, the workflow-level `paths:` filter
+# above has to go and be replaced with the job-level `dorny/paths-filter` pattern
+# used by `rust.yml` -- see the comment at the top of that file for why.
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  MANIFEST: crates/Cargo.toml
+
+jobs:
+  crates:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # See `rust.yml`: the image's bundled stable would make the cache key vary.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      # No explicit `toolchain` -- uses the channel from the root rust-toolchain.toml,
+      # which also installs the wasm32 target.
+      - uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          cache-workspaces: crates
+      - name: fmt
+        run: cargo fmt --manifest-path "$MANIFEST" --all -- --check
+      - name: lint
+        run: cargo clippy --locked --all-targets --manifest-path "$MANIFEST" -- -D warnings
+      - name: docs
+        run: cargo doc --locked --no-deps --manifest-path "$MANIFEST"
+        env:
+          RUSTDOCFLAGS: -D warnings
+      # `candid_types` and `candid_binary` are `no_std`; building for a target that has no
+      # `std` at all is what keeps them so. (`wasm32-unknown-unknown` would not: it ships
+      # one.)
+      - name: no_std
+        run: |
+          rustup target add thumbv7em-none-eabi
+          cargo build --locked --manifest-path "$MANIFEST" -p candid_types -p candid_binary --target thumbv7em-none-eabi
+      - name: test
+        run: cargo test --locked --manifest-path "$MANIFEST"
