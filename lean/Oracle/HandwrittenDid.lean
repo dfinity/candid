@@ -8,8 +8,8 @@ An expected interface is compared with the model's up to equivalence of types, s
 written in whatever table shape reads best: a recursive type as one entry that refers to
 itself, even where the description spells it as two names.
 
-Where `candid` 0.10 answers differently, the document's Appendix A.2 says why; the
-runner lists those vectors as known divergences.
+Where an implementation is known to answer differently, the document's Appendix A.2
+says so.
 -/
 
 import Oracle.HandwrittenText

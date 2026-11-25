@@ -38,8 +38,7 @@ so no enclosing option recovers, nor does anything else, and deserialisation fai
 distinction: it recovers from `none` and passes an exception through. `coerceResult` is what a
 decoder reports for one argument, where the last two both mean a rejected message.
 
-That is the behaviour `candid` has had since 0.10.20 and `test/construct.test.did`
-asserts; the spec said so in #778. The model said `null` here until then.
+`test/construct.test.did` asserts this, and the spec says so since #778.
 
 **Termination.** Every recursive call is on a strictly smaller value, except one: the
 `opt` rule above, which keeps the value and peels the expected type. The model peels

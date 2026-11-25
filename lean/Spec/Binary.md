@@ -483,7 +483,7 @@ it differs from `candid` 0.10, the Rust implementation.
   sequence of references, and a reference value either as a principal or as `00`, an
   index into that sequence. No platform carries the sequence, and 0.10 rejects `00`
   ("Opaque reference not supported"). Here a message is its bytes, `00` is rejected,
-  and the reference count of a future value is ignored.
+  and the reference count of a future value is ignored, as 0.10 ignores it.
 - **Order of members.** [CANDID] "assumes" that fields are in ascending order of id and
   methods in ascending order of name. Here the order is required, strictly, so a
   decoder rejects a repeated field or method. 0.10 agrees.

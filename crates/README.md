@@ -324,6 +324,21 @@ not yet proved.
    costs under [Limits](#limits): measure them, test them on adversarial shapes, and
    set the defaults.
 
+   As built so far: the Lean model writes random messages, often damaged, with
+   `decodeAt`'s exact answer at a receiver's types and a limit on the values
+   (`conformance/differential/`, the optional "Exact answers" of
+   `conformance/README.md`). `tests/differential.rs` in `conformance_tests` requires
+   the same values, failure, undefined coercion, or rejection at the same byte -- and so
+   the same count, since a limit of one value fewer than a message has must stop at the
+   same value. `candid_binary`'s `Rejection` follows the model's kinds, and reports a
+   header error at the start of the item it rejects, as the model does. The committed
+   cases run with `cargo test`; the `differential` workflow runs 40,000 more, from a
+   fixed seed on a pull request and a new one on every push. The `costly` vectors are
+   among them: every case at the oracle's limit is one. Left: receivers
+   that read in other ways than `Value` does -- other fields, giving up, a vector byte by
+   byte where `Value` takes a blob -- which must not change the bytes read, the errors
+   or the count; and the costs.
+
 ## Naming
 
 Identifiers are shared with [lean/](../lean/) wherever they name the same thing. That

@@ -22,14 +22,16 @@ lake build                                    # build the libraries and the exec
 lake exe oracle                               # check the model against every vector
 lake exe oracle write ../conformance/vectors  # regenerate the committed vectors
 lake exe oracle check <file>...               # check vector files against the model
+lake exe oracle differential <file> [<seed> <count>]  # random messages with exact answers
 ```
 
 Two libraries. `Candid` is the model and imports nothing outside Lean's core.
 `Oracle` is about the model: the vector format and its JSON
 ([Oracle/Vector.lean](Oracle/Vector.lean)), the hand-written vectors
-([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), and the generator
-([Oracle/Generate.lean](Oracle/Generate.lean)). It uses `Lean.Data.Json`, which is why
-it is separate. The format itself is specified in
+([Oracle/Handwritten.lean](Oracle/Handwritten.lean)), the generator
+([Oracle/Generate.lean](Oracle/Generate.lean)), and random messages with exact answers
+([Oracle/Differential.lean](Oracle/Differential.lean)). It uses `Lean.Data.Json`, which
+is why it is separate. The format itself is specified in
 [conformance/README.md](../conformance/README.md#format-version-0).
 
 ## What goes here
@@ -44,7 +46,7 @@ to it, in [Spec/](Spec/), the **specification**.
 1. The type language, `Value`, `subtype`, `coerce`, and the wire format as plain
    Lean functions with `Decidable` instances.
 2. A `lake`-built binary that reads a conformance vector file and reports results.
-3. CI wiring: that binary as a differential oracle against the Rust implementation.
+3. CI wiring: that binary as a differential oracle against an implementation.
 4. *Only then*, proofs about those definitions.
 
 Inverting this produces [coq/MiniCandid.v](../coq/MiniCandid.v) again in a
@@ -446,6 +448,31 @@ fourth: 0.10 does not check the method name of a function reference that coercio
 drops, where the document checks every value.
 The other new vectors, on redundant LEB128, a two-byte future opcode and a type
 without values at `reserved`, agree.
+
+## What slice 10 established
+
+**The model as a differential oracle** (item 3 of the ordering rule).
+[Oracle/Differential.lean](Oracle/Differential.lean) writes random messages -- random
+types and values, encoded, often damaged, read at the sender's types, a variation of
+them or unrelated ones, within a limit set to the value -- each with the exact answer
+`decodeAt` gives: the values, failure or undefined coercion, or the rejection and the
+byte it is at. That is an optional part of the conformance format
+([conformance/README.md](../conformance/README.md#exact-answers-optional)), for an
+implementation that reports why and where. Cases from a fixed seed are committed in
+`conformance/differential/` and checked to be up to date. The self-test checks
+`decodeAt_eq` on them too.
+
+**Rejections have kinds.** `DecodeError` carries a `Rejection` beside its message; a
+vector still says only that a message is rejected. To make "the same byte" one answer, a
+header error is at the start of the item it rejects -- the byte, the type reference, the
+list of fields or methods, the entry: a malformed table at its first malformed entry
+(`RawTypeTable.firstMalformed?`), an argument type that does not resolve at that type.
+
+**No implementation is named in the model.** What the model decides, and why, is said
+in its own terms. Where an implementation agrees or differs -- `candid` 0.10 above all --
+is recorded in the appendices of the drafts in [Spec/](Spec/), not in the `.lean`
+files. `Oracle/TestDid.lean` is the exception by its nature: it checks the model's reading
+of `test/*.test.did` against the values `candid_parser` reads there.
 
 ## Constraints
 

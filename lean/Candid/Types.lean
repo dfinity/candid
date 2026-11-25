@@ -8,8 +8,7 @@ would also be the wrong one: it cannot be executed, and it is unlike every
 implementation.
 
 Instead recursion is explicit, through a type table -- which is what the binary
-format calls it (`spec/Candid.md`: "type definition table") and what `candid_types`
-is specified to do with arena indices.
+format calls it (`spec/Candid.md`: "type definition table").
 
 **Nothing here is recursive except the table.** A table entry is a `Composite`; its
 children are `Slot`s; and a `Slot` is a primitive or an index -- never an inline
@@ -40,11 +39,9 @@ syntax is nested, so the parser produces a nested AST and `Candid/Text/Flatten.l
 flattens it into a table; that flattening is also what an encoder does, so it is a
 component this model needs rather than a translation it pays for.
 
-On the name: the implementation in `rust/` calls this a `TypeEnv`, but that `TypeEnv`
-is a `BTreeMap<String, Type>` (`rust/candid/src/types/type_env.rs:7`) -- a *name*-keyed
-environment of `.did` type declarations, which is a different structure from this
-index-keyed table. Both will exist here eventually, so `TypeEnv` is reserved for the
-one where "environment" is the accurate word.
+On the name: a *name*-keyed environment of `.did` type declarations is a different
+structure from this index-keyed table. Both will exist here eventually, so `TypeEnv` is
+reserved for the one where "environment" is the accurate word.
 -/
 
 import Candid.Hash
@@ -193,8 +190,18 @@ def RawTypeTable.methodsDenoteFuncs (t : RawTypeTable) : Composite → Bool
       | .primitive _ => false
   | .opt _ | .vec _ | .record _ | .variant _ | .func _ _ _ | .future _ _ => true
 
+/-- One entry of `t` is well formed: alone, and as `methodsDenoteFuncs` looks through
+`t`. -/
+def RawTypeTable.entryWellFormed (t : RawTypeTable) (c : Composite) : Bool :=
+  c.wellFormed t.size && t.methodsDenoteFuncs c
+
 def RawTypeTable.wellFormed (t : RawTypeTable) : Bool :=
-  t.entries.all fun c => c.wellFormed t.size && t.methodsDenoteFuncs c
+  t.entries.all t.entryWellFormed
+
+/-- The first entry that is not well formed, if any: where a decoder says a table is
+malformed. `none` exactly when the table is well formed. -/
+def RawTypeTable.firstMalformed? (t : RawTypeTable) : Option Nat :=
+  t.entries.toList.findIdx? (!t.entryWellFormed ·)
 
 /-! ## The validated table
 
@@ -237,9 +244,7 @@ alongside: one table has many roots (a message's arguments, a service's methods)
 a slot of `A` cannot be passed where a slot of `B` is expected. That is what the
 two-table subtype procedure needs most, since the case that matters is a table that
 arrived on the wire against the receiver's own, and mixing them up is invisible when
-both are the same table.
-
-Rust has no dependent types; its counterpart is a view borrowing its table. -/
+both are the same table. -/
 abbrev Root (t : TypeTable) := {s : Slot // t.resolves s = true}
 
 def root? (t : TypeTable) (s : Slot) : Option t.Root :=

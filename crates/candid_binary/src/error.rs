@@ -47,6 +47,10 @@ impl core::error::Error for DecodeError {}
 /// 9), which [`Rejection::is_resource_limit`] tells apart, and two that are bugs in a
 /// receiver rather than in the message: [`Rejection::ReceiverMismatch`] and
 /// [`Rejection::FieldNotExpected`].
+///
+/// The rejections the model gives are its `Rejection`s (`lean/Candid/Wire.lean`), by the
+/// same names, at the same byte: the start of the item rejected
+/// (`conformance/README.md`, "Exact answers").
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum Rejection {

@@ -8,11 +8,13 @@ on:
     paths:
       - 'lean/**'
       - 'conformance/vectors/**'
+      - 'conformance/differential/**'
       - '.github/workflows/lean.yml'
   pull_request:
     paths:
       - 'lean/**'
       - 'conformance/vectors/**'
+      - 'conformance/differential/**'
       - '.github/workflows/lean.yml'
 
 # Not a required status check. If it becomes one, the workflow-level `paths:` filter
@@ -57,3 +59,12 @@ jobs:
       - name: conformance vectors agree with the model
         working-directory: lean
         run: lake exe oracle check ../conformance/vectors/*.json
+
+      # The differential cases (`conformance/README.md`, "Exact answers") are the model's
+      # output too, from a fixed seed, and the same holds of them.
+      - name: differential cases are up to date
+        working-directory: lean
+        run: |
+          lake exe oracle differential ../conformance/differential/cases.json
+          git diff --exit-code -- ../conformance/differential
+          test -z "$(git status --porcelain -- ../conformance/differential)"

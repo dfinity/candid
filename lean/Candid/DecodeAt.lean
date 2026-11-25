@@ -1,13 +1,14 @@
 /-
-Decoding at the receiver's types, in one pass: what `candid_binary` will do.
+Decoding at the receiver's types, in one pass.
 
 `deserialize` (`Wire.lean`) is the spec's order: decode the whole message at the
 sender's types, then coerce the values to the receiver's. A decoder that works that way
-builds every value twice, and a typed one would need a coercion of its own beside the
-decoder -- a second implementation of one behaviour. So the Rust decoder does both at
-once: it reads each value at a pair of types, the sender's and the receiver's, and
-builds only the receiver's value. `decodeAt` is that pass, written the way the Rust is,
-so that the Rust can be a transcription of it; and `decodeAt_eq` says it is the spec.
+builds every value twice, and one that builds typed values would need a coercion of its
+own beside the decoder -- a second implementation of one behaviour. A decoder can do
+both at once instead: read each value at a pair of types, the sender's and the
+receiver's, and build only the receiver's value. `decodeAt` is that pass, written as
+such a decoder would be, so that one can be a transcription of it; and `decodeAt_eq`
+says it is the spec.
 
 **Reading at a pair of types.** `decodeValueAt` follows `coerce`, case for case, but where
 `coerce` is handed a value it reads one. A scalar is read at the sender's type and
@@ -131,7 +132,7 @@ def decodeValueAt (A B : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤
             | .error e => .error e
             | .ok ((o, used), ⟨q, hq⟩) =>
               .ok ((o.recover .opt .null, used), ⟨q, by omega, hq.2⟩)
-          | .ok (b, _) => .error ⟨pos, s!"option tag {b}, neither 0 nor 1"⟩
+          | .ok (b, _) => .error ⟨pos, .notAnOptTag, s!"option tag {b}, neither 0 nor 1"⟩
       -- `null` or `reserved`: `null` at any option.
       | none => decodeThen A bs pos hpos stall limit used t fun _ => .ok (some .null)
     else
@@ -166,13 +167,15 @@ def decodeCoreAt (A B : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos ≤ 
           match decodeFieldsAt A B bs pos hpos (stall + 1) limit used fs (sortFields gs) with
           | .error e => .error e
           | .ok ((o, used), q) => .ok ((o.map .record, used), q)
-        else .error ⟨pos, "a record type that contains itself at no cost has no value"⟩
+        else .error ⟨pos, .recordWithoutValue,
+          "a record type that contains itself at no cost has no value"⟩
     | some (.variant fs), some (.variant gs) => match charge pos limit used with
       | .error e => .error e
       | .ok used => match readLeb bs pos with
         | .error e => .error e
         | .ok (i, ⟨p, hp⟩) => match fs[i]? with
-          | none => .error ⟨pos, s!"variant index {i} past the last of {fs.length} alternatives"⟩
+          | none => .error ⟨pos, .variantIndexOutOfRange,
+              s!"variant index {i} past the last of {fs.length} alternatives"⟩
           | some (id, t') => match fieldAt gs id with
             | some u' => match decodeValueAt A B bs p hp.2 0 limit used t' u' with
               | .error e => .error e
@@ -277,18 +280,23 @@ def decodeArgumentsAt (A B : TypeTable) (bs : ByteArray) (pos : Nat) (hpos : pos
       | .error e => .error e
       | .ok ((_, used), ⟨q, hq⟩) => .ok ((o.map fun _ => [], used), ⟨q, by omega, hq.2⟩)
 
+/-- `decodeAt`, with how many values it decoded: the count a limit is checked against. -/
+def decodeAtCounting (bs : ByteArray) (B : TypeTable) (us : List Slot)
+    (limit : Option Nat := none) : Except DecodeError (Outcome (List Value) × Nat) := do
+  let ⟨table, types, pos, hpos⟩ ← decodeHeader bs
+  match decodeArgumentsAt table B bs pos hpos limit 0 types us with
+  | .error e => throw e
+  | .ok ((o, used), ⟨q, _⟩) =>
+    finish bs q
+    return (o, used)
+
 /-- A message, read at the expected types `us` in `B`, decoding at most `limit` values:
 its header, then its values in one pass, then nothing. An error is the message's --
 malformed, or past the limit; otherwise the outcome of coercing its arguments. The same
 answer as `decode` then `coerceArguments` (`decodeAt_eq`, in the header). -/
 def decodeAt (bs : ByteArray) (B : TypeTable) (us : List Slot) (limit : Option Nat := none) :
-    Except DecodeError (Outcome (List Value)) := do
-  let ⟨table, types, pos, hpos⟩ ← decodeHeader bs
-  match decodeArgumentsAt table B bs pos hpos limit 0 types us with
-  | .error e => throw e
-  | .ok ((o, _), ⟨q, _⟩) =>
-    finish bs q
-    return o
+    Except DecodeError (Outcome (List Value)) :=
+  (·.1) <$> decodeAtCounting bs B us limit
 
 /-- `deserializeWithin`, in one pass: decode at most `limit` values. `some` is the
 answer, `none` in it a rejected message; `none` alone is the decoder reaching its limit

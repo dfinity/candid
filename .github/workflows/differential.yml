@@ -1,0 +1,70 @@
+name: Differential
+
+# `candid_binary` held to the Lean model on far more random messages than are committed:
+# fuzzing, with the model as the judge. The model writes the messages and its exact
+# answers (`conformance/README.md`, "Exact answers"); `candid_binary` must give the same
+# answer to each (`crates/conformance_tests/tests/differential.rs`). The one job that
+# needs both toolchains, so that neither `lean.yml` nor `crates.yml` does.
+#
+# On a pull request the seed is fixed, so that its result is the PR's and not the run's;
+# on a push it changes every time, so the branches are fuzzed further as they move. A
+# failure is a disagreement between the two, and the log names the seed that
+# reproduces it.
+#
+# Rides the `rewrite` branch under the carve-out in REWRITE.md, Section 5.
+
+on:
+  push:
+    branches:
+      - master
+      - rewrite
+    paths:
+      - 'lean/**'
+      - 'crates/**'
+      - 'conformance/differential/**'
+      - '.github/workflows/differential.yml'
+  pull_request:
+    paths:
+      - 'lean/**'
+      - 'crates/**'
+      - 'conformance/differential/**'
+      - '.github/workflows/differential.yml'
+
+# Not a required status check. If it becomes one, the workflow-level `paths:` filter
+# above has to go and be replaced with the job-level `dorny/paths-filter` pattern
+# used by `rust.yml` -- see the comment at the top of that file for why.
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  differential:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+        with:
+          lake-package-directory: lean
+          build: true
+          test: false
+          use-mathlib-cache: false
+      # See `rust.yml`: the image's bundled stable would make the cache key vary.
+      - name: Remove pre-installed Rust stable toolchain
+        run: rustup toolchain remove stable 2>/dev/null || true
+      - uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        with:
+          cache-workspaces: crates
+      - name: write cases
+        working-directory: lean
+        run: |
+          echo "seed $SEED"
+          lake exe oracle differential "$RUNNER_TEMP/cases.json" "$SEED" 40000
+        env:
+          SEED: ${{ github.event_name == 'pull_request' && '1' || github.run_id }}
+      - name: candid_binary agrees with the model
+        run: cargo test --locked --manifest-path crates/Cargo.toml -p conformance_tests --test differential
+        env:
+          CANDID_DIFFERENTIAL: ${{ runner.temp }}/cases.json

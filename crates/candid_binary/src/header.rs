@@ -255,13 +255,14 @@ fn entry(r: &mut Reader<'_>) -> Read<Composite> {
             }
         }
         opcode::SERVICE => {
+            let start = r.position();
             let methods = list(r, |r| {
                 let name = String::from(r.text()?);
                 Ok((name, slot(r)?))
             })?;
             // `str`'s order is that of the UTF-8 bytes, which is the spec's.
             if !methods.windows(2).all(|w| w[0].0 < w[1].0) {
-                return r.fail(at, Rejection::MethodsOutOfOrder);
+                return r.fail(start, Rejection::MethodsOutOfOrder);
             }
             Composite::Service(methods)
         }
@@ -514,6 +515,28 @@ mod tests {
         .unwrap_err();
         assert_eq!(e.position(), 7);
         assert!(matches!(e.rejection(), Rejection::MalformedTable(_)));
+    }
+
+    #[test]
+    fn members_out_of_order_point_at_their_list() {
+        // `record {1 : nat; 0 : nat}`: the field list, after the opcode at 5, is at 6.
+        let e = Header::decode(&mut Reader::new(&message(&[
+            0x01, 0x6c, 0x02, 0x01, 0x7d, 0x00, 0x7d, 0x00,
+        ])))
+        .unwrap_err();
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (6, &Rejection::FieldsOutOfOrder)
+        );
+        // `service {b : 0; a : 0}`: the method list is at 6 too, not at the opcode.
+        let e = Header::decode(&mut Reader::new(&message(&[
+            0x01, 0x69, 0x02, 0x01, 0x62, 0x00, 0x01, 0x61, 0x00, 0x00,
+        ])))
+        .unwrap_err();
+        assert_eq!(
+            (e.position(), e.rejection()),
+            (6, &Rejection::MethodsOutOfOrder)
+        );
     }
 
     #[test]

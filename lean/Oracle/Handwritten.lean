@@ -541,8 +541,7 @@ def coerceOptChecks : List Vector :=
   , expectCoerce (.opt (.nat 5)) (optOf nat) optOptNat (some (.opt (.opt (.nat 5))))
       "opt 5 : opt nat ~> opt opt 5 : opt opt nat"
   , expectCoerce (.opt (.nat 5)) (optOf nat) (atom .nat) none "opt 5 : opt nat ~> reject : nat"
-    -- `5 : nat ~> null : reserved`, so the option around it is not `null`. The model
-    -- had this wrong until the candid 0.10 runner disagreed with it.
+    -- `5 : nat ~> null : reserved`, so the option around it is not `null`.
   , expectCoerce (.nat 5) (atom .nat) (optOf reserved) (some (.opt .null))
       "5 : nat ~> opt null : opt reserved"
   , expectCoerce (.opt (.nat 5)) (optOf nat) (optOf reserved) (some (.opt .null))
@@ -582,9 +581,8 @@ Under an enclosing `opt` the two outcomes differ -- a failure becomes `null`, an
 undefined coercion rejects the message -- so the order matters: the parts are decided
 in order, the expected record's fields by ascending id whether the value has them or
 not, and the first that fails or is undefined decides. That is the order a decoder
-meets them in, and candid 0.10's. The model read a record's fields last-to-first until
-these were written. Each expected type is an option around the part, with `R = opt R`
-at entry 0. -/
+meets them in. Each expected type is an option around the part, with `R = opt R` at
+entry 0. -/
 
 /-- `opt c`, with `R` at entry 0 and `c` at entry 2. -/
 def optOverOptCycle (c : Composite) : Fixture :=

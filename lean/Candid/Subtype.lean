@@ -18,8 +18,7 @@ other two rules says `t <: opt t'` whenever `not (null <: t)`, and the remaining
 cases (`t` is `null`, `reserved`, or an `opt`) are covered by their own rules. So
 **`t <: opt t'` holds for every `t` and `t'`** -- which the spec itself notes at the
 top of those rules ("allow, in fact, *any* type to be regarded as a subtype of an
-option"), and which `rust/candid/src/types/subtype.rs:293` implements as a catch-all
-that only warns.
+option").
 
 That collapse is what makes this relation definable as a greatest fixed point at
 all: negative premises are non-monotone, so the rule functional would have no gfp.
@@ -27,9 +26,8 @@ Restating them as one premise-free rule keeps the relation monotone.
 
 **Two tables, not one.** A `Slot` holding a `ref` is meaningless without its table,
 and the case that matters most compares a type table that arrived on the wire against
-the receiver's own type graph -- two unrelated tables. The current Rust signature
-takes a single `env` for both types (`rust/candid/src/types/subtype.rs:19`), which
-works only because callers merge tables first.
+the receiver's own type graph -- two unrelated tables. A procedure over one table
+would need the two merged first.
 
 **The table bounds the recursion.** A composite's children are slots, and composites
 live only in the table (`Types.lean`), so the only way to recurse is through a pair of
