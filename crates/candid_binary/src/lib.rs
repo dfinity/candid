@@ -19,9 +19,9 @@
 //! a copy.
 //!
 //! Every byte of a message comes from an untrusted sender. Nothing here allocates in
-//! advance for a count the message gives, or panics on any input. Nothing recurses as
-//! deep as the sender chooses: skipping a value is a loop, and a receiver nests only as
-//! deep as [`Limits::depth`].
+//! advance for a count the message gives, or panics on any input. Nothing nests as deep
+//! as the sender chooses: a receiver recurses, and skipping a value is a loop over a stack
+//! on the heap, and both stop at [`Limits::depth`], a value skipped or read.
 //!
 //! No global state, no serde. `no_std`.
 

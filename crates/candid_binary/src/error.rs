@@ -121,10 +121,11 @@ pub enum Rejection {
     /// A resource limit: a value of `null`, `reserved` or a record of them takes no bytes,
     /// so a few bytes can stand for any number of them.
     TooManyValues,
-    /// Values nested deeper than [`Limits::depth`](crate::Limits::depth) in what the
-    /// receiver builds.
+    /// A value nested deeper than [`Limits::depth`](crate::Limits::depth), read or
+    /// skipped.
     ///
-    /// A resource limit: a receiver nests as the values do, on the stack.
+    /// A resource limit: a receiver nests as the values do, on the stack, and skipping
+    /// keeps an entry on the heap for each level.
     TooDeep,
     /// Not the message's fault: the receiver asked for a value of another shape than its
     /// own type, the one named, which is a bug in the receiver.

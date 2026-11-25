@@ -185,9 +185,14 @@ pub struct Limits {
     /// value per byte. The default is 2^22, twice the bytes of the largest message the
     /// Internet Computer carries.
     pub values: u64,
-    /// The deepest values may nest in what the receiver builds: in an `opt`, a `vec`, a
-    /// record or a variant. A receiver nests as the values do, on the stack. Skipping a
-    /// value does not nest. The default is 1024.
+    /// The deepest a value may nest: in an `opt`, a `vec`, a record or a variant, an
+    /// argument being at depth 0. A value the receiver reads counts at the receiver's
+    /// types, and one it skips counts on from there, at the sender's.
+    ///
+    /// A receiver nests as the values do, on the stack: about 450 bytes a level for
+    /// `candid_value` on wasm32, so the default of 1024 takes under half of the 1 MiB
+    /// stack a Rust canister has by default. Skipping keeps an entry of tens of bytes on
+    /// the heap for each level open.
     pub depth: usize,
 }
 
