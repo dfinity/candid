@@ -336,6 +336,41 @@ not yet proved.
    a vector byte by byte where `Value` takes a blob -- which must not change the bytes
    read, the rejections or the count, and must get the answer that follows from `Value`'s.
    The costs are measured, and bounded, in [Limits](#limits).
+5. The facade, `candid`, and the derive. Before it, a `Decoder` that has returned an
+   `Err` returns it again on every later call, rather than reading on from the middle
+   of a value: the facade wraps the decoder, and must not be able to reach that state.
+   Then, each its own PR:
+
+   1. `CandidType`: `Encode` and `intern_type`, which adds the type to a table the
+      caller passes in, so that derivation is a pure function ([CLAUDE.md](CLAUDE.md),
+      anti-pattern 2): recursion goes through the table's indices, and a type's entries
+      do not depend on what was derived before it. Implemented for the standard types --
+      the integers, `bool`, `String` and `&str`, `Vec`, `Option`, `Box`, tuples,
+      `Principal` -- and with a native spelling for `blob`. Checked: each type's table is
+      equivalent to the type written by hand (`lean/Spec/Types.md`, Section 5, the same
+      infinite tree), and every vector whose value has a Rust type decodes into it and
+      encodes back.
+   2. `#[derive(CandidType)]` for structs and enums: `Encode`, `Decode` and
+      `intern_type`, with the attributes 0.10 has that are still wanted -- `rename`,
+      and `#[candid(with = "...")]` for a foreign type
+      ([Foreign types get an adapter](#foreign-types-get-an-adapter-not-a-serde-bridge)).
+      A derived `Decode` calls the reader's methods for its type and nothing more, so it
+      is a receiver like `Value`: checked by reading each differential case as a
+      derived type wherever the case's receiver has one, against `Value`'s answer.
+   3. The calls: encoding and decoding an argument list, with the options in a config
+      struct, not the function's name (CLAUDE.md, anti-pattern 4); `DecodeOwned`; an
+      error that names the argument a failure is in. Benchmarked against 0.10 with
+      the canbench suite of `rust/bench`, which counts Wasm instructions.
+
+   `candid_method` and `export_service` are not in this step. They need another way to
+   gather a service's methods than state shared between macro expansions
+   ([The derive crate](#the-derive-crate)), which is a design note first.
+6. `candid_syntax`: one lexer; `.did` descriptions, with imports and type checking; and
+   values as text, parsed and printed. Checked by the `did` and `parse` vectors, which
+   the model writes already, `test/*.test.did`'s among them.
+7. A service's interface from Rust source, replacing `candid_method` and
+   `export_service`: the design note, then the macro. Needs steps 5 and 6.
+8. `candid_bindgen`.
 
 ## Naming
 
