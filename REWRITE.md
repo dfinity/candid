@@ -11,8 +11,10 @@ model, and Rust implementation. It exists so that the reasoning behind it is
 written down and citable rather than undocumented.
 
 **Status:** in progress. The Lean model, the conformance vectors and the spec drafts
-exist on the `rewrite` branch, and the crates have started: `candid_types`, with
-subtyping, and the header of a message in `candid_binary`. **Author:** @lwshang.
+exist on the `rewrite` branch, and so do the first crates: `candid_types`, with
+subtyping; `candid_binary`, which writes messages and reads them at the receiver's
+types, held to the Lean model on random messages; and `candid_value`. **Author:**
+@lwshang.
 
 ---
 
