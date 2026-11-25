@@ -264,28 +264,25 @@ is `candid_syntax`'s, not this crate's.
   is -- skipped, inside another, past the expected arguments. That is Lean's `limit`,
   counted the same way, so that a message one rejects for its count the other does too.
   It is what stops a `vec null` of length 10⁹.
-- `depth`: the deepest a receiver may nest.
+- `depth`: the deepest a value may nest, read or skipped.
 
 Both are resource limits (Binary.md, Section 9), with defaults generous for any real
-message.
+message. What they bound, as measured for step 4:
 
-Two costs are bounded but not yet measured or tuned; step 4 settles them:
-
-- **Skipping uses heap, per level of nesting.** Skipping is a loop over a stack of what
-  is left to read, kept on the heap: one entry, about 40 bytes, for each level still
-  open. Each level is a counted value, so the stack is bounded by `values` -- but at the
-  default of 2²², that is up to about 160 MB, more with the `Vec`'s doubling. A message
-  can get there in a few hundred bytes of values: records whose values take no bytes nest
-  up to `table.len()` deep for each byte. 0.10 skips by recursing on the call stack,
-  with no limit on Wasm, where a deep enough message traps; the rewrite never traps here,
-  but the constant is large. Options: no entry for a level that has nothing left, smaller
-  entries, a default `values` chosen with this cost in mind, or a nesting limit on
-  skipping too.
-- **A receiver nests on the call stack.** Reading at the receiver's types recurses, some
-  frames for each level, up to `depth` = 1024 levels. Whether that fits a Wasm canister's
-  stack (often 1 MB) has not been measured. If it does not, a message nested that deep
-  traps, as every deep message does in 0.10, which has no limit on Wasm. Measure the
-  stack used per level on wasm32, then set the default.
+- **A receiver nests on the call stack.** Reading at the receiver's types recurses: for
+  `candid_value` on wasm32, about 450 bytes of stack a level, whatever the shape. A Rust
+  canister's stack is 1 MiB by default, so the default `depth` of 1024 takes under half
+  of it and leaves the rest to the canister; with no limit, a value about 2,300 deep
+  traps. 0.10 has no limit on Wasm, and traps at 2,500 to 3,000 levels, reading or
+  skipping. A message nested deeper than 1024 and shallower than that is the one 0.10
+  decodes and the rewrite rejects.
+- **Skipping keeps a stack on the heap.** Skipping is a loop over a stack of what is
+  left to read: an entry for each level still open, 48 bytes on a 64-bit target. With
+  only `values` to bound it, a message of 11 KB -- records whose values take no bytes,
+  `table.len()` levels for each byte of `opt` tags -- held 252 MB at the default of 2²².
+  So a skipped value counts against `depth` too, on from the level it is skipped at: the
+  stack holds two entries a level at most, and the same message stops at 0.3 MB, most of
+  it its header.
 
 ### Lean: `decodeAt`
 
@@ -338,7 +335,7 @@ not yet proved.
    receivers that read in other ways than `Value` does -- leaving out fields, giving up,
    a vector byte by byte where `Value` takes a blob -- which must not change the bytes
    read, the rejections or the count, and must get the answer that follows from `Value`'s.
-   Left: the costs.
+   The costs are measured, and bounded, in [Limits](#limits).
 
 ## Naming
 

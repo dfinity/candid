@@ -5,7 +5,8 @@
 //! Skipping is `decodeValue` of `lean/Candid/Wire.lean` with the value thrown away, and
 //! counts and rejects exactly as it does, so that a value the receiver drops costs what
 //! one it keeps does and is checked as well. It is a loop over a stack of what is left to
-//! read, not a recursion: how deep a skipped value nests is the sender's choice.
+//! read, not a recursion, and the stack holds an entry or two for each level open: so a
+//! skipped value nests no deeper than [`Limits::depth`], counted on from the receiver's.
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
@@ -45,17 +46,18 @@ pub(crate) enum Scalar<'a> {
     Principal(&'a [u8]),
 }
 
-/// What is left to skip.
+/// What is left to skip, and how deep: the level of the values it stands for.
 enum Work<'t> {
-    Value(Pending),
+    Value(Pending, usize),
     /// This many more elements of this type.
-    Elements(Slot, u64),
+    Elements(Slot, u64, usize),
     /// These fields of a record, the next with this stall unless bytes were read since
     /// `start`.
     Fields {
         fields: &'t [(FieldId, Slot)],
         stall: usize,
         start: usize,
+        level: usize,
     },
 }
 
@@ -65,7 +67,8 @@ pub(crate) struct Cursor<'a> {
     limits: Limits,
     /// Values counted so far.
     used: u64,
-    /// How deep the receiver is.
+    /// How deep the receiver is: the level of the value it is reading, an argument's
+    /// being 0.
     depth: usize,
     /// The value handed to a receiver that it has not started on. Whoever handed it out
     /// skips it if the receiver never does.
@@ -294,32 +297,42 @@ impl<'a> Cursor<'a> {
             .or_insert_with(|| is_subtype(t, u))
     }
 
-    /// Skip a value: read it at the sender's type, count it and everything in it, and
-    /// throw it away.
+    /// Skip the value the receiver is at: read it at the sender's type, count it and
+    /// everything in it, and throw it away.
     pub(crate) fn skip(&mut self, table: &TypeTable, value: Pending) -> Read<()> {
-        self.skip_all(table, &mut Vec::from([Work::Value(value)]))
+        let level = self.depth;
+        self.skip_all(table, &mut Vec::from([Work::Value(value, level)]))
     }
 
-    /// `n` more elements of type `slot`.
+    /// Skip a part of the value the receiver is at: a field or an alternative, one level
+    /// deeper.
+    pub(crate) fn skip_part(&mut self, table: &TypeTable, value: Pending) -> Read<()> {
+        let level = self.depth.saturating_add(1);
+        self.skip_all(table, &mut Vec::from([Work::Value(value, level)]))
+    }
+
+    /// `n` more elements of type `slot`, of the vector the receiver is at.
     pub(crate) fn skip_elements(&mut self, table: &TypeTable, slot: Slot, n: u64) -> Read<()> {
-        let mut work = Vec::from([Work::Elements(slot, n)]);
+        let level = self.depth.saturating_add(1);
+        let mut work = Vec::from([Work::Elements(slot, n, level)]);
         self.skip_all(table, &mut work)
     }
 
     fn skip_all<'t>(&mut self, table: &'t TypeTable, work: &mut Vec<Work<'t>>) -> Read<()> {
         while let Some(w) = work.pop() {
             match w {
-                Work::Value(p) => self.skip_one(table, p, work)?,
-                Work::Elements(slot, n) => {
+                Work::Value(p, level) => self.skip_one(table, p, level, work)?,
+                Work::Elements(slot, n, level) => {
                     if n > 0 {
-                        work.push(Work::Elements(slot, n - 1));
-                        work.push(Work::Value(Pending { slot, stall: 0 }));
+                        work.push(Work::Elements(slot, n - 1, level));
+                        work.push(Work::Value(Pending { slot, stall: 0 }, level));
                     }
                 }
                 Work::Fields {
                     fields,
                     stall,
                     start,
+                    level,
                 } => {
                     if let [(_, slot), rest @ ..] = fields {
                         let here = self.position();
@@ -328,8 +341,9 @@ impl<'a> Cursor<'a> {
                             fields: rest,
                             stall,
                             start: here,
+                            level,
                         });
-                        work.push(Work::Value(Pending { slot: *slot, stall }));
+                        work.push(Work::Value(Pending { slot: *slot, stall }, level));
                     }
                 }
             }
@@ -337,14 +351,20 @@ impl<'a> Cursor<'a> {
         Ok(())
     }
 
-    /// One value: count it, read what comes before its parts, and leave its parts on
-    /// `work`.
+    /// One value, at `level`: count it, read what comes before its parts, and leave its
+    /// parts on `work`, one level deeper. Past the receiver's limit on depth, as
+    /// [`Cursor::enter`] is.
     fn skip_one<'t>(
         &mut self,
         table: &'t TypeTable,
         p: Pending,
+        level: usize,
         work: &mut Vec<Work<'t>>,
     ) -> Read<()> {
+        if level > self.limits.depth {
+            return self.fail(Rejection::TooDeep);
+        }
+        let deeper = level + 1;
         self.charge()?;
         let r = match p.slot {
             Slot::Primitive(q) => return self.primitive(q).map(drop),
@@ -353,15 +373,16 @@ impl<'a> Cursor<'a> {
         match table.lookup(r) {
             Some(Composite::Opt(inner)) => {
                 if self.opt_tag()? {
-                    work.push(Work::Value(Pending {
+                    let value = Pending {
                         slot: *inner,
                         stall: 0,
-                    }));
+                    };
+                    work.push(Work::Value(value, deeper));
                 }
             }
             Some(Composite::Vec(inner)) => {
                 let n = self.reader.unsigned()?;
-                work.push(Work::Elements(*inner, n));
+                work.push(Work::Elements(*inner, n, deeper));
             }
             Some(Composite::Record(fields)) => {
                 self.record_stall(table, p.stall)?;
@@ -369,14 +390,16 @@ impl<'a> Cursor<'a> {
                     fields,
                     stall: p.stall + 1,
                     start: self.position(),
+                    level: deeper,
                 });
             }
             Some(Composite::Variant(alternatives)) => {
                 let (_, inner) = self.alternative(alternatives)?;
-                work.push(Work::Value(Pending {
+                let value = Pending {
                     slot: inner,
                     stall: 0,
-                }));
+                };
+                work.push(Work::Value(value, deeper));
             }
             Some(Composite::Service(_)) => {
                 self.id()?;

@@ -583,7 +583,7 @@ impl<'r, 'a> ValueReader<'r, 'a> {
                 self.part(Some(value), u, |r| alternative(id, r))
             }
             Err(_) => {
-                self.cursor.skip(self.sender, value)?;
+                self.cursor.skip_part(self.sender, value)?;
                 Ok(None)
             }
         }
@@ -748,7 +748,7 @@ impl<'a> RecordReader<'_, 'a> {
     fn skip_sent(&mut self, slot: Slot) -> Read<()> {
         self.next_sent += 1;
         let stall = self.sent_stall();
-        self.cursor.skip(self.sender, Pending { slot, stall })
+        self.cursor.skip_part(self.sender, Pending { slot, stall })
     }
 
     /// The rest of the record: the receiver's fields not asked for, unless one has failed,
@@ -1201,6 +1201,95 @@ mod tests {
         let e = read(&bytes, &t, r(0), limits, depth).unwrap_err();
         assert_eq!(e.rejection(), &Rejection::TooDeep);
         assert!(e.rejection().is_resource_limit());
+    }
+
+    /// The least depth at which `decode` gets past a message's values: below it,
+    /// `TooDeep`.
+    fn least_depth(decode: impl Fn(Limits) -> Result<(), DecodeError>) -> usize {
+        let at = |depth| {
+            decode(Limits {
+                depth,
+                ..Limits::default()
+            })
+        };
+        let least = (1..64)
+            .find(|&d| at(d).is_ok())
+            .expect("decodes within 64 levels");
+        assert_eq!(at(least - 1).unwrap_err().rejection(), &Rejection::TooDeep);
+        least
+    }
+
+    #[test]
+    fn a_skipped_value_is_as_deep_as_a_read_one() {
+        // `type R = opt R`, seven options deep: its deepest value is seven levels below it,
+        // wherever it is, read or skipped.
+        let deep = [1, 1, 1, 1, 1, 1, 1, 0];
+        let with = |header: &[u8], before: &[u8]| -> Vec<u8> {
+            [b"DIDL", header, before, &deep[..]].concat()
+        };
+        let decoded = |r: Outcome<()>| r.map(drop);
+        let opt_r = Composite::Opt(r(0));
+
+        // Read by the receiver.
+        let bytes = with(&[1, 0x6e, 0, 1, 0], &[]);
+        let t = table(vec![opt_r.clone()]);
+        let depth = |r: ValueReader<'_, '_>| -> Outcome<()> {
+            fn depth(r: ValueReader<'_, '_>) -> Outcome<()> {
+                Ok(r.opt(depth)?.map(drop))
+            }
+            depth(r)
+        };
+        assert_eq!(
+            least_depth(|l| decoded(read(&bytes, &t, r(0), l, depth))),
+            7
+        );
+        // An argument the receiver does not expect.
+        let skipped = |l| Decoder::with_limits(&bytes, l)?.finish();
+        assert_eq!(least_depth(skipped), 7);
+        // An argument at `reserved`.
+        let none = TypeTable::default();
+        let reserved = |l| decoded(read(&bytes, &none, Slot::RESERVED, l, |r| r.reserved()));
+        assert_eq!(least_depth(reserved), 7);
+
+        // A field the receiver's record does not have: one level down.
+        let bytes = with(&[2, 0x6e, 0, 0x6c, 1, 0, 0, 1, 1], &[]);
+        let t = table(vec![Composite::Record(vec![])]);
+        let unknown = |l| decoded(read(&bytes, &t, r(0), l, |r| r.record(|_| Ok(Some(())))));
+        assert_eq!(least_depth(unknown), 8);
+        // A field the receiver drops unread.
+        let t = table(vec![Composite::Record(vec![(FieldId::new(0), Slot::NULL)])]);
+        let dropped = |l| {
+            decoded(read(&bytes, &t, r(0), l, |r| {
+                r.record(|f| f.field(FieldId::new(0), |_| Ok(Some(()))))
+            }))
+        };
+        assert_eq!(least_depth(dropped), 8);
+
+        // An alternative the receiver's variant does not have: one level down.
+        let bytes = with(&[2, 0x6e, 0, 0x6b, 1, 0, 0, 1, 1], &[0]);
+        let t = table(vec![Composite::Variant(vec![(
+            FieldId::new(1),
+            Slot::NULL,
+        )])]);
+        let unknown = |l| decoded(read(&bytes, &t, r(0), l, |r| r.variant(|_, r| r.null())));
+        assert_eq!(least_depth(unknown), 8);
+
+        // The elements after one that fails: an element is one level down, and the deep
+        // one is under an alternative, one more. The first element, alternative 0, fails.
+        let bytes = with(
+            &[3, 0x6e, 0, 0x6b, 2, 0, 0x7f, 1, 0, 0x6d, 1, 1, 2],
+            &[2, 0, 1],
+        );
+        let t = table(vec![
+            Composite::Vec(r(1)),
+            Composite::Variant(vec![(FieldId::new(2), Slot::NULL)]),
+        ]);
+        let rest = |l| {
+            decoded(read(&bytes, &t, r(0), l, |r| {
+                r.vec(|r| r.variant(|_, r| r.null())).map(|v| v.map(drop))
+            }))
+        };
+        assert_eq!(least_depth(rest), 9);
     }
 
     #[test]
