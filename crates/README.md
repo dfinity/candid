@@ -334,10 +334,11 @@ not yet proved.
    header error at the start of the item it rejects, as the model does. The committed
    cases run with `cargo test`; the `differential` workflow runs 40,000 more, from a
    fixed seed on a pull request and a new one on every push. The `costly` vectors are
-   among them: every case at the oracle's limit is one. Left: receivers
-   that read in other ways than `Value` does -- other fields, giving up, a vector byte by
-   byte where `Value` takes a blob -- which must not change the bytes read, the errors
-   or the count; and the costs.
+   among them: every case at the oracle's limit is one. Each case is read again by
+   receivers that read in other ways than `Value` does -- leaving out fields, giving up,
+   a vector byte by byte where `Value` takes a blob -- which must not change the bytes
+   read, the rejections or the count, and must get the answer that follows from `Value`'s.
+   Left: the costs.
 
 ## Naming
 
